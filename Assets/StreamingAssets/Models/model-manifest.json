@@ -1,0 +1,10 @@
+{
+  "id": "qwen3-1.7b-q4",
+  "filename": "qwen3-1.7b-q4.gguf",
+  "version": 1,
+  "sha256": "",
+  "sizeBytes": 0,
+  "contextSize": 2048,
+  "maxTokens": 128,
+  "quantization": "Q4_K_M"
+}

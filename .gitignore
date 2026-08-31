@@ -1,0 +1,14 @@
+/Library/
+/Temp/
+/Logs/
+/UserSettings/
+/.vs/
+/Build/
+/Builds/
+/Native/LlamaBridge/build-*/
+*.csproj
+*.sln
+*.user
+*.apk
+*.aab
+*.so.debug
