@@ -5,7 +5,9 @@
 /.vs/
 /Build/
 /Builds/
+/ForAI/
 /Native/LlamaBridge/build-*/
+/Native/LlamaBridge/third_party/
 *.csproj
 *.sln
 *.user

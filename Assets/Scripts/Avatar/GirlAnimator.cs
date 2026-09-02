@@ -20,10 +20,23 @@ namespace Aigf.Companion.Avatar
         [SerializeField] private string waveTrigger = "Wave";
         [SerializeField] private string emotionParameter = "Emotion";
         [SerializeField] private NamedAnimationBinding[] safeNamedAnimations = Array.Empty<NamedAnimationBinding>();
+        [SerializeField] private ProceduralAvatarMotion proceduralMotion;
+        [SerializeField] private CompanionAnimationPlayer authoredMotion;
+        [SerializeField] private MintFacialDriver facialDriver;
 
         private bool warnedMissingAnimator;
 
         public Animator Animator => animator;
+        public float SitTransitionDuration => authoredMotion != null ? authoredMotion.SitEnterDuration : 0f;
+        public float StandTransitionDuration => authoredMotion != null ? authoredMotion.SitExitDuration : 0f;
+
+        public bool TryGetHips(out Transform hips)
+        {
+            hips = animator != null && animator.isHuman
+                ? animator.GetBoneTransform(HumanBodyBones.Hips)
+                : null;
+            return hips != null;
+        }
 
         private void Awake()
         {
@@ -31,29 +44,35 @@ namespace Aigf.Companion.Avatar
             {
                 animator = GetComponentInChildren<Animator>();
             }
+            if (proceduralMotion == null) proceduralMotion = GetComponent<ProceduralAvatarMotion>();
+            if (authoredMotion == null) authoredMotion = GetComponent<CompanionAnimationPlayer>();
+            if (authoredMotion == null && animator != null) authoredMotion = gameObject.AddComponent<CompanionAnimationPlayer>();
+            if (proceduralMotion != null) proceduralMotion.enabled = false;
+            if (facialDriver == null) facialDriver = GetComponent<MintFacialDriver>();
         }
 
         public void SetWalking(bool walking)
         {
+            if (authoredMotion != null && authoredMotion.SetWalking(walking)) return;
             TrySetBool(walkingParameter, walking);
         }
 
         public void Sit()
         {
+            if (authoredMotion != null && authoredMotion.Sit()) return;
             TrySetTrigger(sitTrigger);
         }
 
         public void Stand()
         {
+            if (authoredMotion != null && authoredMotion.Stand()) return;
             TrySetTrigger(standTrigger);
         }
 
         public void Wave()
         {
-            if (!TrySetTrigger(waveTrigger))
-            {
-                Debug.Log("[AVATAR] Wave requested; placeholder avatar has no Wave trigger.", this);
-            }
+            if (authoredMotion != null && authoredMotion.Greet()) return;
+            TrySetTrigger(waveTrigger);
         }
 
         public bool PlayNamedAnimation(string safeAnimationId)
@@ -81,6 +100,7 @@ namespace Aigf.Companion.Avatar
             }
 
             TrySetFloat(emotionParameter, value);
+            facialDriver?.SetEmotion(value);
         }
 
         private bool TrySetBool(string parameter, bool value)
@@ -123,7 +143,7 @@ namespace Aigf.Companion.Avatar
                 if (!warnedMissingAnimator)
                 {
                     warnedMissingAnimator = true;
-                    Debug.LogWarning("[AVATAR] Animator is missing; actions will use safe logged placeholders.", this);
+                    Debug.LogWarning("[AVATAR] Animator is missing; body animation is disabled to protect the rig.", this);
                 }
 
                 return false;

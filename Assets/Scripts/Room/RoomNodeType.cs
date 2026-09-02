@@ -8,6 +8,8 @@ namespace Aigf.Companion.Room
         Sofa,
         Chair,
         Table,
+        Bed,
+        Cabinet,
         Door,
         Window,
         OtherFurniture

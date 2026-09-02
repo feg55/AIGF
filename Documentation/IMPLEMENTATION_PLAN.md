@@ -1,41 +1,55 @@
-# Implementation Plan
+# Execution plan and result
 
-## Repository findings
+## 1. Repository and release baseline — completed
 
-- Unity Editor: `6000.3.23f1` (the repository does not use Unity 2022.3).
-- Render pipeline: URP `17.3.0`.
-- Navigation: AI Navigation `2.0.14` is installed.
-- Input/UI: Input System `1.20.0` and uGUI `2.0.0` are installed.
-- Android is configured for IL2CPP and ARM64; the current minimum API level is 25.
-- No PICO SDK, OpenXR provider, XR Plug-in Management package, native inference plugin, avatar, product scripts, tests, or project documentation are present.
-- `SampleScene` is the untouched URP template and has no baked NavMesh.
-- There is no Git repository metadata in the supplied directory.
+- Preserved the user's existing modified Unity settings.
+- Ignored the private `ForAI/` source folder.
+- Added Git LFS rules for GGUF, ONNX, and Android native libraries.
+- Standardized Unity/PICO/Android settings and the production scene.
 
-## Implementation sequence
+Why: reproducible source control and a single release path must exist before device features can be trusted.
 
-1. Add a dependency-light runtime assembly and central `AppConfig`.
-2. Add serializable agent contracts, strict JSON parsing, action whitelist, reply limits, and target validation.
-3. Add normalized `RoomGraph`, manual room nodes/interactions, and a PICO adapter boundary that compiles without a PICO SDK.
-4. Add cancellable NavMesh navigation, animation wrapper, sitting alignment, look-at, and amplitude lip sync.
-5. Add deterministic sequential `ActionExecutor`, explicit state, safety validation, and observable action results.
-6. Add bilingual `MockLocalLLM`, compact prompt builder, `GirlBrain`, mock TTS, and debug UI.
-7. Add an Editor demo builder that creates a test scene with floor, player camera, placeholder avatar, sofa interaction points, runtime NavMesh surface, and debug UI.
-8. Add local memory and mock voice pipeline interfaces without making voice a blocker.
-9. Add project-local model manifest/path resolution, one-time Android installation into permanent private files, native C# bridge, and mock fallback.
-10. Add the small C ABI and CMake scaffold around llama.cpp for Android ARM64.
-11. Add EditMode tests for JSON safety, commands, room lookup, prompts, manifests, paths, and sequential action validation.
-12. Compile/test, repair errors, audit model paths and prohibited dispatch mechanisms, and document the exact Editor/PICO setup and remaining hardware work.
+## 2. PICO mixed reality — completed, device validation pending
 
-## Deliberate boundaries
+- Installed PICO Unity Integration SDK 3.4.0 and XR dependencies.
+- Added passthrough, tracked XR origin, Scene Capture semantic mapping, room colliders, interaction anchors, and runtime NavMesh rebuild.
+- Kept generated room geometry strictly Editor-only.
 
-- PICO Scene Capture and passthrough remain adapter-driven until a real PICO SDK is installed. No guessed SDK class names will be committed.
-- The native `.so` and GGUF are external build/content artifacts. The required locations and validation behavior are implemented, but generated binaries are not fabricated.
-- The Editor vertical slice uses a placeholder capsule avatar and generated room geometry, so it does not depend on final art, XR hardware, microphone, or native inference.
-- Dynamic on-device NavMesh generation from PICO room data remains device-dependent; the Editor demo builds from a `NavMeshSurface` at runtime.
+Why: the character must understand and safely navigate the user's actual room instead of a staged demo.
 
-## Verification result
+## 3. Mint avatar — completed, content-quality caveat
 
-- Unity import and scene generation: passed on `6000.3.23f1`.
-- EditMode tests: 16 passed, 0 failed.
-- PlayMode vertical-slice test: 1 passed, 0 failed.
-- PICO hardware/native GGUF inference: not run; the required SDK, GGUF, and ARM64 `.so` are not included in this source snapshot.
+- Converted the supplied source into a normalized humanoid runtime FBX.
+- Removed unused scene data/bones, generated three LODs, configured mobile textures/materials, and built the prefab.
+- Added procedural locomotion, sitting, waving, breathing, attention, blink, emotion, and lip-sync fallbacks.
+
+Why: the original free asset was not mobile-XR ready and did not contain the facial shapes or authored clip set expected by the simulator.
+
+## 4. Local intelligence and memory — completed, device profiling pending
+
+- Bundled pinned Qwen3-0.6B Q8_0 with integrity manifest.
+- Built a pinned llama.cpp ARM64 C ABI and added safe, cancellable inference.
+- Added Qwen prompt formatting, bounded dialogue, and private local memory.
+
+Why: PICO 4 needs a small deterministic offline baseline; the strict action boundary prevents model text from directly controlling Unity.
+
+## 5. Offline Russian voice — completed, device validation pending
+
+- Added microphone capture, Silero VAD, Whisper tiny ASR, Russian Irina VITS TTS, and Sherpa ONNX Android ARM64 bindings.
+- Connected synthesized audio to lip sync and retained mocks for diagnostics.
+
+Why: hands-free local conversation is a core AR use case and must not depend on a network service.
+
+## 6. UX, safety, build, and acceptance — implementation completed
+
+- Added camera-attached world-space diagnostics, safe action execution, personal-space navigation, release asset validation, and automated Android build entry points.
+- Added setup, architecture, build, licensing, attribution, and physical-device checklists.
+
+Remaining acceptance steps:
+
+1. restore a valid Unity Editor entitlement for the installed Unity `6000.3.23f1`;
+2. reimport and rerun EditMode/PlayMode after the final large-asset pass;
+3. build the APK;
+4. complete the PICO 4 hardware checklist and tune performance/anchors from measurements.
+
+The first item is an external licensing blocker, not an unfinished code path.

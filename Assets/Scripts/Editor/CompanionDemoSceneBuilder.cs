@@ -3,6 +3,7 @@ using System.Linq;
 using Aigf.Companion.Agent;
 using Aigf.Companion.Avatar;
 using Aigf.Companion.Core;
+using Aigf.Companion.Pico;
 using Aigf.Companion.Room;
 using Aigf.Companion.UI;
 using Aigf.Companion.Voice;
@@ -14,6 +15,10 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.XR;
+using Unity.XR.CoreUtils;
+using Unity.XR.PXR;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -21,7 +26,7 @@ namespace Aigf.Companion.Editor
 {
     public static class CompanionDemoSceneBuilder
     {
-        public const string DemoScenePath = "Assets/Scenes/CompanionDemo.unity";
+        public const string DemoScenePath = "Assets/Scenes/CompanionMR.unity";
         public const string ConfigAssetPath = "Assets/Settings/CompanionAppConfig.asset";
         public const string MaterialDirectory = "Assets/Settings/CompanionDemoMaterials";
         private static Font font;
@@ -60,25 +65,39 @@ namespace Aigf.Companion.Editor
 
         private static void CreateDemoSceneInternal()
         {
+            EditorSettings.serializationMode = SerializationMode.ForceText;
+            PicoProjectConfigurator.ConfigureForAutomation();
+            MintAvatarAssetBuilder.BuildForAutomation();
             font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             CreateLighting();
             var camera = CreateCamera();
-            var roomProvider = CreateRoom(out var sofaNode, out var surface);
+            var manualRoomProvider = CreateRoom(out var sofaNode, out var surface);
+            var picoRoomProvider = CreatePicoRoomProvider(manualRoomProvider);
             var avatar = CreateAvatar();
-            var debugUi = CreateDebugUI();
+            var debugUi = CreateDebugUI(camera.transform);
             var bootstrap = new GameObject("CompanionBootstrap").AddComponent<AppBootstrap>();
+            bootstrap.gameObject.AddComponent<SherpaVoiceInput>();
             var bootstrapSerialized = new SerializedObject(bootstrap);
             bootstrapSerialized.FindProperty("config").objectReferenceValue = EnsureConfigAsset();
+            bootstrapSerialized.FindProperty("userCamera").objectReferenceValue = camera;
+            bootstrapSerialized.FindProperty("roomProviderComponent").objectReferenceValue = picoRoomProvider;
+            bootstrapSerialized.FindProperty("roomNavMeshBuilder").objectReferenceValue = surface.GetComponent<RoomNavMeshBuilder>();
+            bootstrapSerialized.FindProperty("avatarRoot").objectReferenceValue = avatar.transform;
+            bootstrapSerialized.FindProperty("brain").objectReferenceValue = avatar.GetComponent<GirlBrain>();
+            bootstrapSerialized.FindProperty("actionExecutor").objectReferenceValue = avatar.GetComponent<ActionExecutor>();
+            bootstrapSerialized.FindProperty("navigation").objectReferenceValue = avatar.GetComponent<GirlNavigation>();
+            bootstrapSerialized.FindProperty("avatarInteraction").objectReferenceValue = avatar.GetComponent<AvatarInteraction>();
+            bootstrapSerialized.FindProperty("lookAtUser").objectReferenceValue = avatar.GetComponent<LookAtUser>();
+            bootstrapSerialized.FindProperty("ttsComponent").objectReferenceValue = avatar.GetComponent<SherpaTtsAdapter>();
+            bootstrapSerialized.FindProperty("debugUI").objectReferenceValue = debugUi;
             bootstrapSerialized.ApplyModifiedPropertiesWithoutUndo();
 
-            roomProvider.SetNodes(new[] { sofaNode });
-            surface.BuildNavMesh();
+            manualRoomProvider.SetNodes(new[] { sofaNode });
             EditorSceneManager.SaveScene(scene, DemoScenePath);
             EnsureSceneInBuildSettings();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-
             Selection.activeGameObject = avatar;
             Debug.Log($"[AI] Created Editor vertical slice at {DemoScenePath}. Camera={camera.name}, UI={debugUi.name}");
         }
@@ -94,13 +113,43 @@ namespace Aigf.Companion.Editor
 
         private static Camera CreateCamera()
         {
-            var cameraObject = new GameObject("PlayerCamera");
+            var originObject = new GameObject("XR Origin (PICO)");
+            var xrOrigin = originObject.AddComponent<XROrigin>();
+            xrOrigin.Origin = originObject;
+            xrOrigin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.Floor;
+            xrOrigin.CameraYOffset = 1.65f;
+            originObject.AddComponent<PXR_Manager>();
+
+            var offset = new GameObject("Camera Offset");
+            offset.transform.SetParent(originObject.transform, false);
+            xrOrigin.CameraFloorOffsetObject = offset;
+
+            var cameraObject = new GameObject("Main Camera");
+            cameraObject.transform.SetParent(offset.transform, false);
             cameraObject.tag = "MainCamera";
-            cameraObject.transform.SetPositionAndRotation(new Vector3(0f, 1.65f, -2f), Quaternion.identity);
+            cameraObject.transform.localPosition = new Vector3(0f, 1.65f, -2f);
             var camera = cameraObject.AddComponent<Camera>();
             camera.nearClipPlane = 0.05f;
-            camera.farClipPlane = 100f;
+            camera.farClipPlane = 30f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0f, 0f, 0f, 0f);
             cameraObject.AddComponent<AudioListener>();
+            var driver = cameraObject.AddComponent<TrackedPoseDriver>();
+            var position = new InputAction("HMD Position", binding: "<XRHMD>/centerEyePosition", expectedControlType: "Vector3");
+            var rotation = new InputAction("HMD Rotation", binding: "<XRHMD>/centerEyeRotation", expectedControlType: "Quaternion");
+            var tracking = new InputAction("HMD Tracking State", binding: "<XRHMD>/trackingState", expectedControlType: "Integer");
+            driver.positionInput = new InputActionProperty(position);
+            driver.rotationInput = new InputActionProperty(rotation);
+            driver.trackingStateInput = new InputActionProperty(tracking);
+            driver.ignoreTrackingState = false;
+            xrOrigin.Camera = camera;
+
+            var backend = originObject.AddComponent<PicoSdkPassthroughBackend>();
+            var passthrough = originObject.AddComponent<PicoPassthroughAdapter>();
+            var passthroughSerialized = new SerializedObject(passthrough);
+            passthroughSerialized.FindProperty("backendComponent").objectReferenceValue = backend;
+            passthroughSerialized.FindProperty("xrCamera").objectReferenceValue = camera;
+            passthroughSerialized.ApplyModifiedPropertiesWithoutUndo();
             return camera;
         }
 
@@ -108,6 +157,7 @@ namespace Aigf.Companion.Editor
         {
             var environment = new GameObject("ManualRoom");
             var provider = environment.AddComponent<ManualRoomProvider>();
+            environment.AddComponent<EditorRoomFallbackGeometry>();
 
             var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
             floor.name = "Floor";
@@ -119,12 +169,12 @@ namespace Aigf.Companion.Editor
             var sofa = GameObject.CreatePrimitive(PrimitiveType.Cube);
             sofa.name = "Sofa_1";
             sofa.transform.SetParent(environment.transform);
-            sofa.transform.SetPositionAndRotation(new Vector3(2f, 0.45f, 1.2f), Quaternion.identity);
-            sofa.transform.localScale = new Vector3(2f, 0.9f, 0.8f);
+            sofa.transform.SetPositionAndRotation(new Vector3(2f, 0.25f, 1.2f), Quaternion.identity);
+            sofa.transform.localScale = new Vector3(2f, 0.5f, 0.8f);
             SetColor(sofa, new Color(0.14f, 0.36f, 0.55f));
 
             var approach = CreateAnchor("ApproachPoint", sofa.transform, new Vector3(2f, 0f, 0.25f), Quaternion.identity);
-            var sit = CreateAnchor("SitPoint", sofa.transform, new Vector3(2f, 0.9f, 1.05f), Quaternion.Euler(0f, 180f, 0f));
+            var sit = CreateAnchor("SitPoint", sofa.transform, new Vector3(2f, 0.5f, 1.05f), Quaternion.Euler(0f, 180f, 0f));
             var interaction = sofa.AddComponent<InteractionAnchor>();
             interaction.Configure(approach, sit, sit);
             sofaNode = sofa.AddComponent<RoomNode>();
@@ -139,13 +189,35 @@ namespace Aigf.Companion.Editor
                 "manual editor sofa");
 
             surface = environment.AddComponent<NavMeshSurface>();
-            surface.collectObjects = CollectObjects.Children;
+            surface.collectObjects = CollectObjects.All;
             surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
+            environment.AddComponent<RoomNavMeshBuilder>();
+            return provider;
+        }
+
+        private static PicoRoomProvider CreatePicoRoomProvider(ManualRoomProvider fallback)
+        {
+            var runtime = new GameObject("PICO Room Runtime");
+            var source = runtime.AddComponent<PicoSdkSceneSource>();
+            var provider = runtime.AddComponent<PicoRoomProvider>();
+            var serialized = new SerializedObject(provider);
+            serialized.FindProperty("picoSceneSourceComponent").objectReferenceValue = source;
+            serialized.FindProperty("editorFallback").objectReferenceValue = fallback;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
             return provider;
         }
 
         private static GameObject CreateAvatar()
         {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(MintAvatarAssetBuilder.PrefabPath);
+            if (prefab != null)
+            {
+                var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                instance.name = "Mint Companion";
+                instance.transform.position = new Vector3(-1f, 0f, 0.5f);
+                return instance;
+            }
+
             var root = new GameObject("GirlAvatar_Placeholder");
             root.transform.position = new Vector3(-1f, 0f, 0.5f);
             var agent = root.AddComponent<NavMeshAgent>();
@@ -188,11 +260,16 @@ namespace Aigf.Companion.Editor
             return root;
         }
 
-        private static BrainDebugUI CreateDebugUI()
+        private static BrainDebugUI CreateDebugUI(Transform cameraTransform)
         {
             var canvasObject = new GameObject("CompanionDebugCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasObject.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvasObject.transform.SetParent(cameraTransform, false);
+            canvasObject.transform.localPosition = new Vector3(-0.42f, -0.18f, 1.15f);
+            canvasObject.transform.localRotation = Quaternion.identity;
+            canvasObject.transform.localScale = Vector3.one * 0.00055f;
+            canvasObject.GetComponent<RectTransform>().sizeDelta = new Vector2(720f, 990f);
             var scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -346,12 +423,13 @@ namespace Aigf.Companion.Editor
 
         private static void EnsureSceneInBuildSettings()
         {
-            var scenes = EditorBuildSettings.scenes.ToList();
-            if (scenes.All(scene => scene.path != DemoScenePath))
-            {
-                scenes.Add(new EditorBuildSettingsScene(DemoScenePath, true));
-                EditorBuildSettings.scenes = scenes.ToArray();
-            }
+            var scenes = EditorBuildSettings.scenes
+                .Where(scene => scene.path != DemoScenePath &&
+                                scene.path != "Assets/Scenes/CompanionDemo.unity" &&
+                                scene.path != "Assets/Scenes/SampleScene.unity")
+                .ToList();
+            scenes.Insert(0, new EditorBuildSettingsScene(DemoScenePath, true));
+            EditorBuildSettings.scenes = scenes.ToArray();
         }
     }
 }

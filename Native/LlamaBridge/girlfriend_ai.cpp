@@ -160,6 +160,7 @@ int32_t gf_generate(
 
     int32_t result = 0;
     llama_batch batch = llama_batch_get_one(tokens.data(), token_count);
+    llama_token next_token = 0;
     std::string generated;
     generated.reserve(static_cast<size_t>(std::min(output_capacity - 1, 4096)));
 
@@ -184,8 +185,8 @@ int32_t gf_generate(
             break;
         }
 
-        llama_token next = token;
-        batch = llama_batch_get_one(&next, 1);
+        next_token = token;
+        batch = llama_batch_get_one(&next_token, 1);
     }
 
     llama_sampler_free(sampler);

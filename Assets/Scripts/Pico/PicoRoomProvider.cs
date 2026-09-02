@@ -26,7 +26,7 @@ namespace Aigf.Companion.Pico
 
     public sealed class PicoRoomProvider : MonoBehaviour, IRoomProvider
     {
-        [Tooltip("Install the PICO SDK, then assign an adapter implementing IPicoSceneSource. No PICO SDK API is guessed here.")]
+        [Tooltip("PICO Scene Capture adapter used by the production scene.")]
         [SerializeField] private MonoBehaviour picoSceneSourceComponent;
         [SerializeField] private ManualRoomProvider editorFallback;
 
@@ -38,20 +38,38 @@ namespace Aigf.Companion.Pico
             var source = picoSceneSourceComponent as IPicoSceneSource;
             if (source == null || !source.IsSceneCaptureAvailable)
             {
-                Debug.LogWarning("[PICO] Scene Capture adapter is unavailable; using the manual room provider.", this);
+                Debug.LogWarning("[PICO] Scene Capture adapter is unavailable.", this);
+#if UNITY_EDITOR
                 if (editorFallback != null)
                 {
+                    Debug.LogWarning("[PICO] Using the Editor-only manual room fallback.", this);
                     Current = await editorFallback.LoadAsync(cancellationToken);
                     IsReady = true;
                     return Current;
                 }
+#endif
 
                 Current = new RoomGraph();
                 IsReady = true;
                 return Current;
             }
 
-            var semanticObjects = await source.QuerySemanticObjectsAsync(cancellationToken);
+            IReadOnlyList<PicoSemanticObject> semanticObjects;
+            try
+            {
+                semanticObjects = await source.QuerySemanticObjectsAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[PICO] Scene Capture failed; room actions are disabled: {exception.Message}", this);
+                Current = new RoomGraph();
+                IsReady = true;
+                return Current;
+            }
             Current = new RoomGraph();
             if (semanticObjects != null)
             {
@@ -98,7 +116,7 @@ namespace Aigf.Companion.Pico
             }
         }
 
-        private static RoomNodeType MapType(string label)
+        public static RoomNodeType MapType(string label)
         {
             switch ((label ?? string.Empty).Trim().ToLowerInvariant())
             {
@@ -108,6 +126,8 @@ namespace Aigf.Companion.Pico
                 case "couch": return RoomNodeType.Sofa;
                 case "chair": return RoomNodeType.Chair;
                 case "table": return RoomNodeType.Table;
+                case "bed": return RoomNodeType.Bed;
+                case "cabinet": return RoomNodeType.Cabinet;
                 case "door": return RoomNodeType.Door;
                 case "window": return RoomNodeType.Window;
                 default: return RoomNodeType.Unknown;

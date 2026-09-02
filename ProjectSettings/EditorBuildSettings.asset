@@ -6,11 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
-  - enabled: 1
-    path: Assets/Scenes/CompanionDemo.unity
-    guid: f7b1504f9d4cb004bb3f4ce16b3edf49
+    path: Assets/Scenes/CompanionMR.unity
+    guid: 903d2f827e0e9da489dfb60c8de62856
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 7bd861919e3166e4d99a496b78999ce2, type: 2}
   m_UseUCBPForAssetBundles: 0

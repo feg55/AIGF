@@ -127,15 +127,17 @@ namespace Aigf.Companion.AI
 
         private NativeResult GenerateNative(string prompt)
         {
-            var buffer = new StringBuilder(OutputBufferBytes);
+            var buffer = new byte[OutputBufferBytes];
             var code = Native.gf_generate(
                 prompt,
                 config.MaxTokens,
                 config.Temperature,
                 config.TopP,
                 buffer,
-                buffer.Capacity);
-            return new NativeResult(code, buffer.ToString());
+                buffer.Length);
+            var length = Array.IndexOf(buffer, (byte)0);
+            if (length < 0) length = buffer.Length;
+            return new NativeResult(code, Encoding.UTF8.GetString(buffer, 0, length));
         }
 
         private static void RequestNativeCancellation()
@@ -173,7 +175,7 @@ namespace Aigf.Companion.AI
                 int maxTokens,
                 float temperature,
                 float topP,
-                StringBuilder output,
+                [Out] byte[] output,
                 int outputCapacity);
 
             [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]

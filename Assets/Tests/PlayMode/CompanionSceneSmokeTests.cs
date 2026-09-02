@@ -15,21 +15,21 @@ namespace Aigf.Companion.Tests
         [Timeout(30000)]
         public IEnumerator GeneratedSceneExecutesCoreMockCommands()
         {
-            SceneManager.LoadScene("CompanionDemo", LoadSceneMode.Single);
+            SceneManager.LoadScene("CompanionMR", LoadSceneMode.Single);
             yield return null;
 
             var bootstrapDeadline = Time.realtimeSinceStartup + 8f;
             AppBootstrap bootstrap = null;
             while (Time.realtimeSinceStartup < bootstrapDeadline)
             {
-                bootstrap = Object.FindFirstObjectByType<AppBootstrap>();
+                bootstrap = Object.FindAnyObjectByType<AppBootstrap>();
                 if (bootstrap != null && bootstrap.IsInitialized) break;
                 yield return null;
             }
 
             Assert.That(bootstrap, Is.Not.Null, "Demo scene has no AppBootstrap.");
             Assert.That(bootstrap.IsInitialized, Is.True, "Companion bootstrap did not initialize.");
-            var brain = Object.FindFirstObjectByType<GirlBrain>();
+            var brain = Object.FindAnyObjectByType<GirlBrain>();
             Assert.That(brain, Is.Not.Null);
             Assert.That(brain.Room.Count, Is.GreaterThanOrEqualTo(1));
 

@@ -20,6 +20,8 @@ namespace Aigf.Companion.Agent
         private ILocalLLM localLlm;
         private ITts tts;
         private MemoryRetriever memoryRetriever;
+        private IMemoryStore memoryStore;
+        private readonly Queue<ConversationTurn> recentTurns = new Queue<ConversationTurn>();
         private RoomGraph room;
         private AppConfig config;
         private CancellationTokenSource activeRequest;
@@ -64,6 +66,12 @@ namespace Aigf.Companion.Agent
             config = appConfig != null ? appConfig : AppConfig.CreateRuntimeDefaults();
             memoryRetriever = retriever;
             DiagnosticsChanged?.Invoke();
+        }
+
+        public void SetMemoryStore(IMemoryStore store)
+        {
+            memoryStore = store;
+            memoryRetriever = store != null ? new MemoryRetriever(store) : null;
         }
 
         public async Task<ActionResult> ProcessUserMessageAsync(
@@ -136,6 +144,16 @@ namespace Aigf.Companion.Agent
                 }
 
                 var result = await actionExecutor.ExecuteAsync(reply, token);
+                if (result.Succeeded)
+                {
+                    RememberTurn(userMessage.Trim(), reply.Speech);
+                    if (memoryStore != null)
+                    {
+                        await memoryStore.AddAsync(
+                            new MemoryItem($"User: {userMessage.Trim()} Companion: {reply.Speech}", 0.35f),
+                            token);
+                    }
+                }
                 LastError = result.Succeeded ? string.Empty : result.Message;
                 DiagnosticsChanged?.Invoke();
                 return result;
@@ -172,8 +190,15 @@ namespace Aigf.Companion.Agent
                 AvatarPosition = avatarRoot != null ? avatarRoot.position : transform.position,
                 State = CurrentState,
                 Room = room,
-                Memories = memories
+                Memories = memories,
+                RecentTurns = new List<ConversationTurn>(recentTurns)
             };
+        }
+
+        private void RememberTurn(string user, string assistant)
+        {
+            recentTurns.Enqueue(new ConversationTurn(user, assistant));
+            while (recentTurns.Count > 6) recentTurns.Dequeue();
         }
     }
 }

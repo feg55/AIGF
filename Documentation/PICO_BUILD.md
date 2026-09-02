@@ -1,54 +1,38 @@
-# PICO 4 build path
+# PICO 4 release build
 
-## Current project settings
+## Release configuration
 
-- Unity: `6000.3.23f1`
-- Android scripting backend: IL2CPP
-- target architecture: ARM64 only
-- minimum Android API: 29
-- package ID: `com.aigf.localcompanion`
-- rendering: URP
+- Unity `6000.3.23f1`
+- PICO Unity Integration SDK `3.4.0`
+- Android API 29, ARM64, IL2CPP, Release
+- package ID `com.aigf.mintcompanion`
+- OpenGLES3, Linear color space, URP, Multiview
+- passthrough, hand tracking, and Scene Capture enabled
+- production scene: `Assets/Scenes/CompanionMR.unity`
 
-## Required vendor setup
+## Build
 
-This repository does not currently contain PICO XR/OpenXR packages. Install a PICO-supported Unity 6 SDK/provider version from PICO's official distribution, then configure XR Plug-in Management and the PICO Android provider using that version's documentation.
+1. In Unity Hub, confirm Android Build Support, SDK/NDK, and OpenJDK for Unity `6000.3.23f1`, then sign in and confirm that the Editor has a valid entitlement.
+2. Run `git lfs pull` and open the project once so Unity finishes importing large assets.
+3. Run **AIGF > Validate PICO Release**. Fix every reported missing asset before building.
+4. Run the EditMode and PlayMode tests.
+5. Run **AIGF > Build PICO 4 Release APK**.
 
-Do not add guessed calls to `PicoRoomProvider`. Implement two small SDK-specific components instead:
+The output is `Builds/MintARCompanion.apk`. The build tool uses a clean Release build and validates the exact Qwen size/SHA-256, llama.cpp ARM64 bridge, Sherpa managed/native bindings, speech models, Mint prefab, and production scene.
 
-1. `IPicoPassthroughBackend` for enabling/disabling passthrough.
-2. `IPicoSceneSource` for querying captured semantic objects and returning `PicoSemanticObject` descriptors.
+## First device launch
 
-Assign those components to `PicoPassthroughAdapter` and `PicoRoomProvider`. The manual provider remains the fallback.
+1. Allow microphone, spatial sensing/room access, and passthrough permissions when PICO requests them.
+2. If no captured room exists, complete **Settings > Boundary > Room Capture** and restart the app.
+3. Wait while the bundled GGUF is copied to private app storage and verified. Keep roughly 2 GB of free storage for installation and first-launch extraction.
+4. Confirm that walls, floor, doors, windows, tables, sofas, and beds align with the physical room before enabling free movement.
 
-Scene Capture labels must be normalized to stable IDs. Seats require project-generated or SDK-derived `ApproachPoint`, `SitPoint`, and `SitRotation`. Floor and obstacle geometry must feed a runtime NavMesh adapter before free movement in a captured room is enabled.
+The application performs no model download at runtime. If local inference cannot initialize, the diagnostic panel reports the error and the safe mock responder remains available.
 
-## Native llama.cpp
+## Native versions
 
-1. Use the Android SDK/NDK/JDK installed with this Unity Editor.
-2. Pin a llama.cpp commit.
-3. Follow `Native/LlamaBridge/README.md` to configure CMake for `arm64-v8a` and Android API 29.
-4. Copy `libgirlfriend_ai.so` to `Assets/Plugins/Android/arm64-v8a/`.
-5. In the Unity plugin importer, enable Android/ARM64 and disable incompatible platforms.
+- Qwen model: `Qwen/Qwen3-0.6B-GGUF`, Q8_0, pinned revision from `model-manifest.json`.
+- llama.cpp: tag `v0.1.2`, commit `1511ce3bc3f087376c8526b4ad07100bfabb277f`.
+- sherpa-onnx native libraries: `1.13.0` for Android ARM64.
 
-The C ABI is limited to `gf_init`, `gf_generate`, `gf_cancel`, and `gf_shutdown`.
-
-## Model packaging
-
-Place the real GGUF at `Assets/StreamingAssets/Models/qwen3-1.7b-q4.gguf` before building. It is bundled into the application; there is no startup network fetch.
-
-At first launch, `BundledModelInstaller` writes the asset to permanent private app files, verifies optional size/SHA-256, and records the installed manifest. Later launches reuse it. A manifest version/hash change causes a verified replacement.
-
-Large GGUF assets significantly increase APK size and first-launch installation time. Validate available internal storage and packaging limits on the target deployment channel.
-
-## Android checklist
-
-1. Switch Build Profile to Android.
-2. Confirm IL2CPP and ARM64.
-3. Confirm the PICO XR loader/provider and required Android permissions.
-4. Confirm passthrough and Scene Capture capabilities in the vendor manifest/settings.
-5. Include `CompanionDemo` or the production XR scene in Build Profiles.
-6. Confirm the real GGUF and ARM64 `.so` exist.
-7. Build and install the APK.
-8. Test model installation, inference latency, thermals, memory use, cancellation, passthrough, captured-room mapping, NavMesh boundaries, seating anchors, and personal-space behavior on PICO 4.
-
-No PICO hardware validation has been performed in this repository.
+Run the full checklist in `Documentation/PICO_DEVICE_TEST.md` on a physical PICO 4 before distribution.

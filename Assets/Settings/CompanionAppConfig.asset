@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 97294db9d032ef945a2ed88720856749, type: 3}
   m_Name: CompanionAppConfig
   m_EditorClassIdentifier: Aigf.Companion.Runtime::Aigf.Companion.Core.AppConfig
-  useMockLLM: 1
+  useMockLLM: 0
   fallBackToMockWhenModelUnavailable: 1
-  modelFilename: qwen3-1.7b-q4.gguf
+  modelFilename: qwen3-0.6b-q8_0.gguf
   contextSize: 2048
   maxTokens: 128
   threads: 4

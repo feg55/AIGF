@@ -37,6 +37,11 @@ namespace Aigf.Companion.Memory
             lock (gate)
             {
                 EnsureLoaded();
+                if (collection.items.Count > 0 &&
+                    string.Equals(collection.items[collection.items.Count - 1].Text, item.Text, StringComparison.Ordinal))
+                {
+                    return Task.CompletedTask;
+                }
                 collection.items.Add(item);
                 if (collection.items.Count > 200)
                 {
@@ -45,7 +50,10 @@ namespace Aigf.Companion.Memory
 
                 var directory = Path.GetDirectoryName(path);
                 if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-                File.WriteAllText(path, JsonUtility.ToJson(collection, true));
+                var temporaryPath = path + ".tmp";
+                File.WriteAllText(temporaryPath, JsonUtility.ToJson(collection, true));
+                File.Copy(temporaryPath, path, true);
+                File.Delete(temporaryPath);
             }
 
             return Task.CompletedTask;

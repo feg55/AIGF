@@ -13,6 +13,7 @@ namespace Aigf.Companion.Agent
         public AgentState State { get; set; }
         public RoomGraph Room { get; set; }
         public IReadOnlyList<MemoryItem> Memories { get; set; }
+        public IReadOnlyList<ConversationTurn> RecentTurns { get; set; }
 
         public float DistanceToUser => Vector3.Distance(AvatarPosition, UserPosition);
     }

@@ -1,0 +1,25 @@
+{
+  "activeProfileIndex": 0,
+  "keepOnlyActiveProfile": true,
+  "buildOnlyActiveProfile": true,
+  "profiles": [
+    {
+      "profileName": "silero-vad",
+      "modelType": 0,
+      "modelSource": 0,
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+      "sampleRate": 16000,
+      "numThreads": 1,
+      "provider": "cpu",
+      "allowInt8": false,
+      "threshold": 0.5,
+      "minSilenceDuration": 0.65,
+      "minSpeechDuration": 0.25,
+      "maxSpeechDuration": 12.0,
+      "model": "silero_vad.onnx",
+      "windowSize": 512,
+      "bufferSizeInSeconds": 30.0,
+      "remoteBaseUrl": ""
+    }
+  ]
+}

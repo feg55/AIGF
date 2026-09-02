@@ -33,6 +33,9 @@ add_library(girlfriend_ai SHARED girlfriend_ai.cpp)
 target_include_directories(girlfriend_ai PRIVATE
     "${LLAMA_CPP_DIR}/include"
     "${LLAMA_CPP_DIR}/ggml/include")
-target_link_libraries(girlfriend_ai PRIVATE llama log android)
+# Unity's Android player already ships libc++_shared. Link against the same
+# runtime so static llama.cpp archives do not pull a second C++ runtime into
+# the APK and all std:: symbols resolve in the final plugin.
+target_link_libraries(girlfriend_ai PRIVATE llama log android c++_shared)
 target_compile_options(girlfriend_ai PRIVATE -fvisibility=hidden -ffunction-sections -fdata-sections)
 target_link_options(girlfriend_ai PRIVATE -Wl,--gc-sections)

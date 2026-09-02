@@ -1,0 +1,37 @@
+{
+  "activeProfileIndex": 0,
+  "offlineRecognizerPoolSize": 1,
+  "keepOnlyActiveProfile": true,
+  "buildOnlyActiveProfile": true,
+  "profiles": [
+    {
+      "profileName": "sherpa-onnx-whisper-tiny",
+      "modelType": 2,
+      "modelSource": 0,
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.tar.bz2",
+      "numThreads": 2,
+      "provider": "cpu",
+      "tokens": "tiny-tokens.txt",
+      "allowInt8": false,
+      "sampleRate": 16000,
+      "featureDim": 80,
+      "decodingMethod": "greedy_search",
+      "maxActivePaths": 4,
+      "hotwordsFile": "",
+      "hotwordsScore": 1.5,
+      "ruleFsts": "",
+      "ruleFars": "",
+      "blankPenalty": 0.0,
+      "lmModel": "",
+      "lmScale": 0.5,
+      "whisperEncoder": "tiny-encoder.onnx",
+      "whisperDecoder": "tiny-decoder.onnx",
+      "whisperLanguage": "ru",
+      "whisperTask": "transcribe",
+      "whisperTailPaddings": -1,
+      "whisperEnableTokenTimestamps": false,
+      "whisperEnableSegmentTimestamps": false,
+      "remoteBaseUrl": ""
+    }
+  ]
+}

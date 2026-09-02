@@ -1,0 +1,9 @@
+{
+  "sampleRate": 16000,
+  "clipLengthSec": 10,
+  "micStartTimeoutSec": 4.0,
+  "resamplingMode": 0,
+  "manageAudioSession": true,
+  "androidReturnToNormalOnStop": false,
+  "androidAudioSessionSettleMs": 500
+}

@@ -1,59 +1,35 @@
 # Status
 
-## IMPLEMENTED
+## Implemented
 
-- strict `AgentReply` JSON contract, ten-action whitelist, five-action limit, safe identifiers, and `RoomGraph` target validation
-- sequential cancellable `ActionExecutor`
-- semantic `RoomGraph`, explicit seat geometry, `ManualRoomProvider`, and SDK-neutral PICO room/passthrough boundaries
-- NavMesh walk-to-user, walk-to-node, follow refresh threshold, stop, timeout, sampling, and personal space
-- deterministic sit/stand alignment and state
-- centralized animation wrapper, safe named-animation map, head look, and amplitude lip sync
-- bilingual Russian/English `MockLocalLLM`, compact prompt, `GirlBrain`, debug text UI, and convenience buttons
-- mock VAD/STT/TTS, voice pipeline, local memory store, and bounded retrieval
-- project-local model manifest/path resolver, one-time permanent Android installer, optional size/SHA-256 verification
-- async `LlamaCppLocalLLM` P/Invoke layer with serialized inference and cancellation
-- Android ARM64 llama.cpp C ABI/CMake scaffold
-- Editor demo scene generator and EditMode tests
-- Android IL2CPP/ARM64 project settings
+- production PICO MR scene with XR origin, tracked camera, passthrough, Scene Capture, semantic room mapping, and runtime NavMesh;
+- Mint mobile avatar derived from the supplied source, normalized to 1.63 m, reduced from 488 to 227 used bones, with three LODs and Android texture settings;
+- safe animation facade for walking, sitting, standing, waving, breathing, emotion, look-at, blink, and amplitude lip sync;
+- local `Qwen3-0.6B` Q8_0 model with exact size/SHA-256 manifest and Qwen chat template;
+- pinned llama.cpp Android ARM64 bridge with cancellation, bounded generation, and UTF-8 output;
+- offline Sherpa ONNX microphone/VAD/Whisper ASR/Russian VITS TTS path with managed and Android ARM64 native bindings;
+- strict JSON action contract, semantic target validation, cancellable execution, personal-space controls, and local bounded memory;
+- release validator/builder, Git LFS rules, attribution, setup/build/device-test documentation.
 
-## PARTIALLY IMPLEMENTED
+## Verified before the final asset pass
 
-- local LLM: managed/native integration exists; a real GGUF and compiled native library are not included
-- voice: interfaces, orchestration, and mocks exist; production local VAD/STT/TTS engines and their model assets are not included
-- PICO MR: clean adapters exist; no vendor SDK implementation is possible until a supported PICO package is installed
-- dynamic MR navigation: semantic boundary exists; runtime floor/obstacle NavMesh generation is not implemented
-- animation: wrapper and calls exist; the generated scene uses safe logged placeholders without an Animator Controller
+- Unity imported and compiled the core runtime, Editor tooling, PICO integration, and tests without C# errors.
+- EditMode: 16/16 passed.
+- PlayMode: 1/1 acceptance scenario passed.
+- `libgirlfriend_ai.so` built successfully for AArch64 and has the expected Android dependencies.
+- Qwen and speech model files were downloaded from their official upstream releases and validated locally.
+- After the final pass, Roslyn compilation passed for runtime, Editor build tooling, test assemblies, the `SHERPA_ONNX` package path, and the Android-only PICO Scene Capture branch. All bundled native libraries report AArch64 ELF headers.
 
-## EDITOR TESTED
+## Pending verification
 
-- Unity `6000.3.23f1` imported and compiled the runtime, Editor tooling, and tests with no C# errors.
-- `CompanionDemo` was generated in the repository with a baked NavMesh, manual sofa anchors, debug UI, runtime config, and new-Input-System EventSystem.
-- EditMode: 16/16 tests passed (`Logs/editmode-results.xml`).
-- PlayMode: 1/1 scene acceptance test passed in 4.7 seconds (`Logs/playmode-results-2.xml`). It executed bootstrap, come-here navigation/personal space, wave, sofa walk/sit, stand, follow/stop, and look-at-user.
+- Reimport and rerun the test suites after the final Sherpa/native/model additions.
+- Produce `Builds/MintARCompanion.apk`.
+- Run the physical PICO 4 checklist for permissions, room alignment, microphone, Russian speech, latency, thermals, RAM, and long-session stability.
 
-## DEVICE DEPENDENT
+These steps are currently blocked because command-line Unity exits with `No valid Unity Editor license found`. Android Build Support, SDK/NDK, and OpenJDK are already installed for the pinned Unity `6000.3.23f1`. Refresh/activate Unity Personal in Unity Hub and reopen the project; no source-code change can replace that entitlement.
 
-- PICO passthrough and Scene Capture permissions/APIs
-- real HMD transform/XR rig assignment
-- runtime NavMesh construction from captured geometry
-- llama.cpp ARM64 performance, thermals, RAM, and optional GPU offload
-- first-launch installation duration for the selected GGUF
-- Android microphone and final offline voice engines
+## Known content limitation
 
-## TODO
+The supplied free character contains no usable facial blend shapes or authored production animation clips. The application provides procedural motion and safe Animator hooks, but final commercial-quality facial expression and locomotion require compatible authored assets. The source model also depicts third-party character IP; review distribution rights before release.
 
-- add the licensed `qwen3-1.7b-q4.gguf`, byte size, and SHA-256
-- pin/build llama.cpp and copy `libgirlfriend_ai.so`
-- install the selected PICO SDK and implement the two adapter components
-- integrate a production humanoid avatar, Animator Controller, safe clips, and calibrated seat anchors
-- integrate and profile offline VAD/STT/TTS models
-- implement captured-floor/obstacle NavMesh updates
-- run and record PICO 4 hardware acceptance tests
-
-## MANUAL UNITY SETUP REQUIRED
-
-- wait for first import, open `Assets/Scenes/CompanionDemo.unity`, and press Play
-- run EditMode tests in Test Runner
-- add the real GGUF/native plugin before disabling mock mode
-- install/configure PICO XR packages before building a passthrough APK
-- tune avatar root, agent dimensions, head bone, animation parameters, and interaction anchors for final art
+The old `Assets/Scenes/CompanionDemo.unity` remains in the repository because it had pre-existing uncommitted changes. It is disabled in Build Settings; `CompanionMR` is the only release scene.

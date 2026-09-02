@@ -1,7 +1,12 @@
 {
   "name": "Aigf.Companion.Runtime",
   "rootNamespace": "Aigf.Companion",
-  "references": [],
+  "references": [
+    "Unity.AI.Navigation",
+    "Unity.XR.PICO",
+    "PonyuDev.SherpaOnnx",
+    "UniTask"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

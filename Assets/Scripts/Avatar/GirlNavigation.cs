@@ -143,18 +143,36 @@ namespace Aigf.Companion.Avatar
 
         public ActionResult ResumeAt(Vector3 preferredPosition)
         {
+            if (!TryResolveNavigablePosition(preferredPosition, out var resolvedPosition))
+            {
+                return ActionResult.Failure("No NavMesh point found near the standing position.");
+            }
+
+            return ResumeAtResolved(resolvedPosition);
+        }
+
+        public bool TryResolveNavigablePosition(Vector3 requestedPosition, out Vector3 resolvedPosition)
+        {
+            resolvedPosition = requestedPosition;
+            if (navMeshAgent == null ||
+                !NavMesh.SamplePosition(requestedPosition, out var hit, SampleRadius, NavMesh.AllAreas))
+            {
+                return false;
+            }
+
+            resolvedPosition = hit.position;
+            return true;
+        }
+
+        public ActionResult ResumeAtResolved(Vector3 resolvedPosition)
+        {
             if (navMeshAgent == null)
             {
                 return ActionResult.Failure("NavMeshAgent is missing.");
             }
 
-            if (!NavMesh.SamplePosition(preferredPosition, out var hit, SampleRadius, NavMesh.AllAreas))
-            {
-                return ActionResult.Failure("No NavMesh point found near the standing position.");
-            }
-
             navMeshAgent.enabled = true;
-            if (!navMeshAgent.Warp(hit.position))
+            if (!navMeshAgent.Warp(resolvedPosition))
             {
                 return ActionResult.Failure("NavMeshAgent could not resume at the standing position.");
             }
@@ -231,7 +249,6 @@ namespace Aigf.Companion.Avatar
         private async Task FollowLoopAsync(CancellationToken cancellationToken)
         {
             var lastUserPosition = new Vector3(float.PositiveInfinity, 0f, 0f);
-            girlAnimator?.SetWalking(true);
             try
             {
                 while (!cancellationToken.IsCancellationRequested)
@@ -254,6 +271,10 @@ namespace Aigf.Companion.Avatar
                             lastUserPosition = flatUser;
                         }
                     }
+
+                    var shouldWalk = navMeshAgent.hasPath &&
+                                     navMeshAgent.remainingDistance > navMeshAgent.stoppingDistance + 0.05f;
+                    girlAnimator?.SetWalking(shouldWalk);
 
                     await Task.Yield();
                 }

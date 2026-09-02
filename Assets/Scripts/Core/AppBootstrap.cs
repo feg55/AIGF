@@ -3,6 +3,7 @@ using Aigf.Companion.AI;
 using Aigf.Companion.Agent;
 using Aigf.Companion.Avatar;
 using Aigf.Companion.Memory;
+using Aigf.Companion.Pico;
 using Aigf.Companion.Room;
 using Aigf.Companion.UI;
 using Aigf.Companion.Voice;
@@ -14,7 +15,9 @@ namespace Aigf.Companion.Core
     {
         [SerializeField] private AppConfig config;
         [SerializeField] private Camera userCamera;
-        [SerializeField] private ManualRoomProvider roomProvider;
+        [SerializeField] private MonoBehaviour roomProviderComponent;
+        [SerializeField] private RoomNavMeshBuilder roomNavMeshBuilder;
+        [SerializeField] private PicoPassthroughAdapter passthrough;
         [SerializeField] private Transform avatarRoot;
         [SerializeField] private GirlBrain brain;
         [SerializeField] private ActionExecutor actionExecutor;
@@ -32,7 +35,8 @@ namespace Aigf.Companion.Core
             {
                 ResolveSceneReferences();
                 if (config == null) config = AppConfig.CreateRuntimeDefaults();
-                if (roomProvider == null) throw new InvalidOperationException("ManualRoomProvider is missing.");
+                var roomProvider = roomProviderComponent as IRoomProvider;
+                if (roomProvider == null) throw new InvalidOperationException("A room provider is missing.");
                 if (avatarRoot == null) throw new InvalidOperationException("Avatar root is missing.");
                 if (brain == null || actionExecutor == null || navigation == null)
                 {
@@ -40,6 +44,11 @@ namespace Aigf.Companion.Core
                 }
 
                 var room = await roomProvider.LoadAsync(destroyCancellationToken);
+                roomNavMeshBuilder?.Rebuild(room);
+                if (passthrough != null)
+                {
+                    await passthrough.SetEnabledAsync(true, destroyCancellationToken);
+                }
                 var hmd = userCamera != null ? userCamera.transform : null;
                 navigation.Configure(config, hmd);
                 avatarInteraction?.Configure(config);
@@ -58,6 +67,7 @@ namespace Aigf.Companion.Core
                     avatarRoot,
                     config,
                     memoryRetriever);
+                brain.SetMemoryStore(memoryStore);
 
                 debugUI?.Bind(brain);
                 IsInitialized = true;
@@ -99,15 +109,41 @@ namespace Aigf.Companion.Core
         private void ResolveSceneReferences()
         {
             if (userCamera == null) userCamera = Camera.main;
-            if (roomProvider == null) roomProvider = FindFirstObjectByType<ManualRoomProvider>();
-            if (brain == null) brain = FindFirstObjectByType<GirlBrain>();
+            if (!(roomProviderComponent is IRoomProvider))
+            {
+                var providers = FindObjectsByType<MonoBehaviour>(
+                    FindObjectsInactive.Exclude,
+                    FindObjectsSortMode.None);
+                for (var i = 0; i < providers.Length; i++)
+                {
+                    if (providers[i] is IRoomProvider)
+                    {
+                        roomProviderComponent = providers[i];
+                        break;
+                    }
+                }
+            }
+            if (roomNavMeshBuilder == null) roomNavMeshBuilder = FindAnyObjectByType<RoomNavMeshBuilder>();
+            if (passthrough == null) passthrough = FindAnyObjectByType<PicoPassthroughAdapter>();
+            if (brain == null) brain = FindAnyObjectByType<GirlBrain>();
             if (avatarRoot == null && brain != null) avatarRoot = brain.transform;
             if (actionExecutor == null && avatarRoot != null) actionExecutor = avatarRoot.GetComponent<ActionExecutor>();
             if (navigation == null && avatarRoot != null) navigation = avatarRoot.GetComponent<GirlNavigation>();
             if (avatarInteraction == null && avatarRoot != null) avatarInteraction = avatarRoot.GetComponent<AvatarInteraction>();
             if (lookAtUser == null && avatarRoot != null) lookAtUser = avatarRoot.GetComponent<LookAtUser>();
-            if (ttsComponent == null && avatarRoot != null) ttsComponent = avatarRoot.GetComponent<MockTts>();
-            if (debugUI == null) debugUI = FindFirstObjectByType<BrainDebugUI>();
+            if (ttsComponent == null && avatarRoot != null)
+            {
+                var components = avatarRoot.GetComponents<MonoBehaviour>();
+                for (var i = 0; i < components.Length; i++)
+                {
+                    if (components[i] is ITts)
+                    {
+                        ttsComponent = components[i];
+                        break;
+                    }
+                }
+            }
+            if (debugUI == null) debugUI = FindAnyObjectByType<BrainDebugUI>();
         }
     }
 }

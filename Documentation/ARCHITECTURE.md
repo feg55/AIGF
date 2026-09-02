@@ -3,83 +3,52 @@
 ## Runtime flow
 
 ```text
-debug text / future microphone
-        -> GirlBrain
-        -> ILocalLLM (MockLocalLLM or LlamaCppLocalLLM)
-        -> AgentJson + AgentSafety
-        -> ActionExecutor whitelist
-        -> GirlNavigation / AvatarInteraction / GirlAnimator / LookAtUser
-        -> avatar
+PICO microphone -> Sherpa VAD/Whisper ASR --+
+debug UI -----------------------------------+-> GirlBrain
+                                               -> Qwen/llama.cpp
+                                               -> strict AgentReply JSON
+                                               -> ActionExecutor whitelist
+                                               -> navigation / interaction / animation
 
-reply speech -> ITts -> AudioSource -> AvatarLipSync
-room adapter -> RoomGraph -> compact PromptBuilder context
+reply text -> Sherpa VITS TTS -> AudioSource -> amplitude lip sync
+PICO Scene Capture -> semantic RoomGraph -> runtime NavMesh -> safe targets
+local memory -----------------------------------------------> prompt context
 ```
 
-`GirlBrain` owns request cancellation and high-level orchestration. A newer command cancels the previous TTS, native generation where supported, and obsolete action sequence.
+`GirlBrain` owns cancellation and high-level orchestration. A new request cancels obsolete speech, native generation, and the previous action sequence.
 
 ## LLM-to-body safety boundary
 
-The model emits only `AgentReply` data. `AgentJson` rejects malformed/wrapped output, unknown properties, unknown action types, non-finite distances, oversized identifiers, replies over five actions, and room IDs absent from `RoomGraph`.
+The model emits data only. `AgentJson` rejects wrapped/malformed JSON, unknown fields or action types, non-finite distances, oversized identifiers, more than five actions, and room IDs absent from `RoomGraph`.
 
-`ActionExecutor` uses an explicit `switch` over:
+`ActionExecutor` uses an explicit whitelist: `walk_to_user`, `walk_to`, `sit`, `stand`, `follow_user`, `stop`, `look_at_user`, `look_at`, `wave`, and safe-ID `play_animation`. There is no reflection, `SendMessage`, arbitrary native dispatch, generated code, filesystem command, or model-authored Animator parameter.
 
-- `walk_to_user`
-- `walk_to`
-- `sit`
-- `stand`
-- `follow_user`
-- `stop`
-- `look_at_user`
-- `look_at`
-- `wave`
-- `play_animation`
+Unity stays authoritative over NavMesh sampling/reachability, personal distance, room anchors, seated state, and cancellation.
 
-No reflection, `SendMessage`, dynamic method selection, arbitrary native dispatch, generated code, filesystem command, or model-authored Animator parameter is used. Named animations must map to an Inspector-configured safe ID. Unity remains authoritative over destinations, NavMesh sampling, reachability, interaction anchors, seating, state, and cancellation.
+## PICO room and navigation
 
-## RoomGraph
+`PicoSdkSceneSource` queries PICO spatial anchors, semantic labels, poses, bounds, and polygons after Scene Capture. `PicoRoomProvider` converts them into stable `RoomNode` records. Seats receive explicit approach and sit transforms. `RoomNavMeshBuilder` rebuilds navigation from captured floor and obstacle colliders.
 
-`RoomGraph` exposes semantic `RoomNode` records instead of meshes. Each node has a stable ID, type, bounds, semantic metadata, and explicit approach/interaction geometry. Seats are valid only when both an `ApproachPoint` and `SitPoint` exist.
+If device room data is unavailable, the Android build fails safely with an empty room graph. Generated room geometry is an Editor-only fallback and is disabled on Android.
 
-`ManualRoomProvider` supplies the Editor scene. `PicoRoomProvider` consumes the project-owned `IPicoSceneSource` boundary and maps labels into normalized nodes. Because this repository has no PICO SDK, no vendor class names are referenced or guessed.
+Passthrough is isolated behind `IPicoPassthroughBackend`; the concrete backend delegates to `PXR_Manager`. Gameplay depends on project-owned interfaces rather than PICO types.
 
-## Navigation and interaction
+## Avatar
 
-`GirlNavigation` samples every requested destination onto the NavMesh, maintains user personal space, refreshes follow destinations only after meaningful user movement, supports timeouts/cancellation, and never teleports during normal walking.
+The Mint root owns navigation, interaction, brain, speech, and animation components. The imported humanoid FBX keeps only deforming bones and supplies LOD0/LOD1/LOD2. `GirlAnimator` exposes centralized, safe animation operations; `ProceduralAvatarMotion` supplies a fallback when an authored controller/clip is missing. `MintFacialDriver`, `LookAtUser`, and `AvatarLipSync` handle blink, head/eye attention, and speech amplitude.
 
-Sitting is deterministic:
+## Local inference
 
-```text
-validate seat -> walk to ApproachPoint -> stop agent -> trigger sit
--> disable navigation -> align root to SitPoint/SitRotation -> Sitting
-```
+The canonical GGUF is in `Assets/StreamingAssets/Models`. Android copies it once to private persistent storage, verifies the manifest size/SHA-256, and replaces it only when the pinned manifest changes.
 
-Standing triggers its transition, samples the seat approach position, resumes the agent there, and returns to `Idle`. Missing NavMesh/Animator/anchors produce action failures or warnings, not null-reference crashes.
+`LlamaCppLocalLLM` serializes native access, runs generation away from the Unity main thread, forwards cancellation to the llama abort callback, and decodes UTF-8 bytes explicitly. The native boundary contains only `gf_init`, `gf_generate`, `gf_cancel`, and `gf_shutdown`.
 
-## Local inference and model storage
+The prompt uses Qwen chat control tokens, `/no_think`, compact room facts, a bounded recent dialogue, and retrieved local memories. Output remains subject to the strict parser and executor boundary.
 
-The canonical model is always:
+## Offline voice
 
-`Assets/StreamingAssets/Models/<model>.gguf`
+`SherpaVoiceInput` uses the microphone, Silero VAD, and Whisper tiny Russian ASR. `SherpaTtsAdapter` synthesizes Russian speech using the Irina VITS voice. Profiles and model assets are bundled under `Assets/StreamingAssets/SherpaOnnx`; no cloud service is called. The underlying `IVad`, `IStt`, and `ITts` boundaries still allow deterministic mocks for Editor diagnostics.
 
-Editor opens that file directly. Android reads the bundled asset and installs it once into permanent private `Application.persistentDataPath/models`. The installed manifest version, filename, optional size, and optional SHA-256 decide whether replacement is necessary. No runtime network fetch is implemented.
+## Memory and privacy
 
-`LlamaCppLocalLLM` runs `gf_generate` on a worker task and serializes access with `SemaphoreSlim`. `gf_cancel` drives llama.cpp's CPU abort callback. The C# gameplay layer sees only `ILocalLLM`; llama.cpp headers and types remain under `Native/LlamaBridge`.
-
-## Voice and lip sync
-
-`IVad`, `IStt`, and `ITts` isolate offline voice engines. Mock implementations keep the loop usable without microphone or voice models. `VoicePipeline` accepts an `AudioClip`, applies VAD, STT, and forwards text to `GirlBrain`. `AvatarLipSync` uses a cached amplitude buffer and optional mouth blend shape.
-
-Real sherpa-onnx/whisper.cpp/TTS adapters are not included; they can be added without changing the brain or action layer.
-
-## Memory
-
-`LocalMemoryStore` holds at most 200 explicit local items in private persistent storage. `MemoryRetriever` returns at most a few keyword/recency/importance-ranked items. Full chat history and embeddings are not required or injected into every prompt.
-
-## PICO integration boundary
-
-- HMD pose enters as a normal `Transform`.
-- passthrough enters through `IPicoPassthroughBackend`.
-- Scene Capture enters through `IPicoSceneSource`.
-- the rest of the application depends only on `RoomGraph` and Unity components.
-
-On-device dynamic NavMesh construction from captured floor/walls is deliberately not claimed complete. The Editor vertical slice uses AI Navigation's baked `NavMeshSurface`.
+`LocalMemoryStore` keeps at most 200 deduplicated items in the app's private persistent directory. `MemoryRetriever` selects a small keyword/recency/importance-ranked subset. Audio, room data, prompts, and model inference remain local; the application implements no telemetry or runtime model download.

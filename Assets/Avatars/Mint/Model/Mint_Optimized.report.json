@@ -1,0 +1,34 @@
+{
+  "source": "Mint Swimsuit1.fbx",
+  "targetHeightMeters": 1.63,
+  "materials": 10,
+  "bonesBefore": 488,
+  "bonesAfter": 227,
+  "texturesRebound": [
+    "T_019_mint_swimsuit_hair_01_d.png",
+    "T_player_019_mint_eyes_d.png",
+    "T_player_019_mint_face_d1.png",
+    "T_player_019_mint_hair_02_d.png",
+    "T_player_019_mint_swimsuit_01_d.png",
+    "T_player_019_mint_swimsuit_02_d.png",
+    "T_player_019_mint_swimsuit_03_d.png",
+    "image_(1).jpg"
+  ],
+  "lods": [
+    {
+      "name": "Mint_LOD0",
+      "vertices": 52806,
+      "triangles": 71986
+    },
+    {
+      "name": "Mint_LOD1",
+      "vertices": 32632,
+      "triangles": 38761
+    },
+    {
+      "name": "Mint_LOD2",
+      "vertices": 18470,
+      "triangles": 18457
+    }
+  ]
+}

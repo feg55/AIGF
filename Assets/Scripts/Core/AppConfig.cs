@@ -6,9 +6,9 @@ namespace Aigf.Companion.Core
     public sealed class AppConfig : ScriptableObject
     {
         [Header("Local LLM")]
-        [SerializeField] private bool useMockLLM = true;
+        [SerializeField] private bool useMockLLM;
         [SerializeField] private bool fallBackToMockWhenModelUnavailable = true;
-        [SerializeField] private string modelFilename = "qwen3-1.7b-q4.gguf";
+        [SerializeField] private string modelFilename = "qwen3-0.6b-q8_0.gguf";
         [SerializeField, Min(512)] private int contextSize = 2048;
         [SerializeField, Range(16, 512)] private int maxTokens = 128;
         [SerializeField, Range(1, 12)] private int threads = 4;

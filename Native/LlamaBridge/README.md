@@ -6,11 +6,20 @@ This directory builds the small C ABI consumed by `LlamaCppLocalLLM`. Upstream l
 
 - Unity 6000.3 Android Build Support, including its Android SDK, NDK, OpenJDK, and CMake toolchain.
 - The NDK selected in Unity **Preferences > External Tools**. Unity 6 installations commonly provide NDK r27; use the exact version supported by the installed Editor.
-- A pinned llama.cpp checkout compatible with the API used here. Record the commit in your release notes; do not build production artifacts from an unpinned moving branch.
+- The pinned llama.cpp checkout used for the bundled binary: tag `v0.1.2`, commit `1511ce3bc3f087376c8526b4ad07100bfabb277f`.
 
-The bridge follows the current upstream C API (`llama_model_load_from_file`, `llama_init_from_model`, `llama_batch_get_one`, and sampler chains). If a newer pinned llama.cpp changes its ABI, update this single bridge rather than the Unity gameplay layer.
+The bridge follows that revision's C API (`llama_model_load_from_file`, `llama_init_from_model`, `llama_batch_get_one`, and sampler chains). If a newer pinned llama.cpp changes its ABI, update this single bridge rather than the Unity gameplay layer.
 
 ## Configure and build
+
+Clone the exact upstream revision into the ignored dependency directory:
+
+```text
+git clone --branch v0.1.2 --depth 1 https://github.com/ggml-org/llama.cpp Native/LlamaBridge/third_party/llama.cpp
+git -C Native/LlamaBridge/third_party/llama.cpp rev-parse HEAD
+```
+
+The second command must print `1511ce3bc3f087376c8526b4ad07100bfabb277f`.
 
 From a terminal with `ANDROID_NDK` pointing at Unity's NDK:
 
@@ -21,7 +30,7 @@ cmake -S Native/LlamaBridge -B Native/LlamaBridge/build-android \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_PLATFORM=android-29 \
   -DCMAKE_BUILD_TYPE=Release \
-  -DLLAMA_CPP_DIR=C:/path/to/pinned/llama.cpp
+  -DLLAMA_CPP_DIR=Native/LlamaBridge/third_party/llama.cpp
 
 cmake --build Native/LlamaBridge/build-android --config Release
 ```
@@ -30,7 +39,7 @@ Use shell-appropriate path syntax on macOS/Linux. Copy the resulting `libgirlfri
 
 `Assets/Plugins/Android/arm64-v8a/libgirlfriend_ai.so`
 
-In Unity's plugin importer, enable Android, select ARM64, and disable Editor platforms unless you also build a matching desktop library.
+The bridge links Android's shared C++ runtime. Copy the resulting library to the existing plugin location and keep its importer Android/ARM64-only.
 
 ## Runtime flow
 
