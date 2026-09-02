@@ -31,6 +31,7 @@ namespace Aigf.Companion.Editor
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel29;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.Android.applicationEntry = AndroidApplicationEntry.Activity;
+            PlayerSettings.Android.resizeableActivity = false;
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.SetIl2CppCompilerConfiguration(NamedBuildTarget.Android, Il2CppCompilerConfiguration.Release);
             EnsureScriptingDefine(NamedBuildTarget.Android, "SHERPA_ONNX");
@@ -59,6 +60,7 @@ namespace Aigf.Companion.Editor
                 settings.stereoRenderingModeAndroid = PXR_Settings.StereoRenderingModeAndroid.Multiview;
                 settings.optimizeBufferDiscards = true;
                 EditorUtility.SetDirty(settings);
+                EditorBuildSettings.AddConfigObject("Unity.XR.PXR.Settings", settings, true);
             }
             AssetDatabase.SaveAssets();
         }

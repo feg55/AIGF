@@ -118,7 +118,11 @@ namespace Aigf.Companion.Editor
             xrOrigin.Origin = originObject;
             xrOrigin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.Floor;
             xrOrigin.CameraYOffset = 1.65f;
-            originObject.AddComponent<PXR_Manager>();
+            var picoManager = originObject.AddComponent<PXR_Manager>();
+            var picoManagerSerialized = new SerializedObject(picoManager);
+            var openMrc = picoManagerSerialized.FindProperty("openMRC");
+            if (openMrc != null) openMrc.boolValue = false;
+            picoManagerSerialized.ApplyModifiedPropertiesWithoutUndo();
 
             var offset = new GameObject("Camera Offset");
             offset.transform.SetParent(originObject.transform, false);
@@ -127,7 +131,9 @@ namespace Aigf.Companion.Editor
             var cameraObject = new GameObject("Main Camera");
             cameraObject.transform.SetParent(offset.transform, false);
             cameraObject.tag = "MainCamera";
-            cameraObject.transform.localPosition = new Vector3(0f, 1.65f, -2f);
+            // The tracked camera pose must start at the XR origin. A desktop preview
+            // offset here leaks into device tracking and breaks Scene Capture alignment.
+            cameraObject.transform.localPosition = Vector3.zero;
             var camera = cameraObject.AddComponent<Camera>();
             camera.nearClipPlane = 0.05f;
             camera.farClipPlane = 30f;

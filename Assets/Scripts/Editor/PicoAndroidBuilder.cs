@@ -13,7 +13,8 @@ namespace Aigf.Companion.Editor
     public static class PicoAndroidBuilder
     {
         public const string OutputPath = "Builds/MintARCompanion.apk";
-        private const long MinimumFreeDiskBytes = 12L * 1024L * 1024L * 1024L;
+        private const long MinimumCleanBuildFreeDiskBytes = 12L * 1024L * 1024L * 1024L;
+        private const long MinimumIncrementalBuildFreeDiskBytes = 6L * 1024L * 1024L * 1024L;
         private const string NativePluginPath =
             "Assets/Plugins/Android/arm64-v8a/libgirlfriend_ai.so";
 
@@ -32,16 +33,16 @@ namespace Aigf.Companion.Editor
 
         public static void BuildReleaseApkForAutomation()
         {
-            PicoProjectConfigurator.ConfigureForAutomation();
-            ValidateReleaseAssets();
-            ValidateFreeDiskSpace();
-
             if (!EditorUserBuildSettings.SwitchActiveBuildTarget(
                     BuildTargetGroup.Android,
                     BuildTarget.Android))
             {
                 throw new InvalidOperationException("Could not switch the active build target to Android.");
             }
+
+            PicoProjectConfigurator.ConfigureForAutomation();
+            ValidateReleaseAssets();
+            ValidateFreeDiskSpace();
 
             var output = Path.GetFullPath(OutputPath);
             Directory.CreateDirectory(Path.GetDirectoryName(output) ?? "Builds");
@@ -75,11 +76,15 @@ namespace Aigf.Companion.Editor
             if (string.IsNullOrEmpty(driveRoot)) return;
 
             var available = new DriveInfo(driveRoot).AvailableFreeSpace;
-            if (available >= MinimumFreeDiskBytes) return;
+            var hasAndroidBuildCache = Directory.Exists(Path.Combine(projectRoot, "Library", "Bee", "Android"));
+            var required = hasAndroidBuildCache
+                ? MinimumIncrementalBuildFreeDiskBytes
+                : MinimumCleanBuildFreeDiskBytes;
+            if (available >= required) return;
 
             throw new BuildFailedException(
                 $"Not enough free disk space for the Android build. " +
-                $"Free at least 12 GiB on {driveRoot} and retry; " +
+                $"Free at least {required / (1024L * 1024L * 1024L)} GiB on {driveRoot} and retry; " +
                 $"currently available: {available / (1024f * 1024f * 1024f):0.0} GiB.");
         }
 
@@ -96,6 +101,21 @@ namespace Aigf.Companion.Editor
             RequireText(
                 "Assets/Plugins/Android/AndroidManifest.xml",
                 "android.permission.RECORD_AUDIO");
+            RequireText(
+                "Assets/Plugins/Android/AndroidManifest.xml",
+                "com.picovr.permission.SPATIAL_DATA");
+            RequireText(
+                "Assets/Plugins/Android/AndroidManifest.xml",
+                "android.hardware.vr.headtracking");
+            RequireText(
+                "Assets/Plugins/Android/AndroidManifest.xml",
+                "pvr.app.type");
+            RequireText(
+                "Assets/Plugins/Android/AndroidManifest.xml",
+                "enable_vst");
+            RequireText(
+                "Assets/Plugins/Android/AndroidManifest.xml",
+                "com.picovr.intent.category.VR");
             RequireProjectFile("Assets/Plugins/SherpaOnnx/sherpa-onnx.dll");
             RequireProjectFile("Assets/Plugins/SherpaOnnx/Android/arm64-v8a/libonnxruntime.so");
             RequireProjectFile("Assets/Plugins/SherpaOnnx/Android/arm64-v8a/libsherpa-onnx-c-api.so");

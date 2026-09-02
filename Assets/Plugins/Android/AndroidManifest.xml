@@ -3,14 +3,37 @@
           xmlns:tools="http://schemas.android.com/tools">
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+  <uses-permission android:name="com.picovr.permission.SPATIAL_DATA" />
+  <uses-permission android:name="com.picovr.permission.HAND_TRACKING" />
 
-  <application>
+  <uses-feature android:name="android.hardware.vr.headtracking"
+                android:version="1"
+                android:required="true" />
+
+  <application android:requestLegacyExternalStorage="true">
+    <!-- Keep the PICO launch/runtime metadata here as well as in the SDK build hook.
+         The SDK hook is compiled only for an Android-active Unity editor, while our
+         one-click builder can switch from Windows to Android and build immediately. -->
+    <meta-data android:name="pvr.app.type" android:value="vr" />
+    <meta-data android:name="pvr.display.orientation" android:value="180" />
+    <meta-data android:name="pxr.sdk.version_code" android:value="5150" />
+    <meta-data android:name="use.pxr.sdk" android:value="1" />
+    <meta-data android:name="pvr.sdk.version" android:value="XR Platform_3.4.0" />
+    <meta-data android:name="rendering_mode" android:value="1" />
+    <meta-data android:name="enable_vst" android:value="1" />
+    <meta-data android:name="enable_scene_anchor" android:value="1" />
+    <meta-data android:name="handtracking" android:value="1" />
+    <meta-data android:name="controller" android:value="1" />
+
     <activity android:name="com.unity3d.player.UnityPlayerActivity"
               android:theme="@style/UnityThemeSelector"
+              android:hardwareAccelerated="true"
+              android:resizeableActivity="false"
               android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
+        <category android:name="com.picovr.intent.category.VR" />
       </intent-filter>
       <meta-data android:name="unityplayer.UnityActivity" android:value="true" />
     </activity>
