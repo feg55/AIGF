@@ -29,16 +29,20 @@ namespace Aigf.Companion.Editor
         public const string DemoScenePath = "Assets/Scenes/CompanionMR.unity";
         public const string ConfigAssetPath = "Assets/Settings/CompanionAppConfig.asset";
         public const string MaterialDirectory = "Assets/Settings/CompanionDemoMaterials";
+        private const string ControllerMenuScriptGuid = "67d5d306a4784b3f93c833124c79271b";
         private static Font font;
 
         [InitializeOnLoadMethod]
         private static void CreateMissingDemoOnFirstImport()
         {
-            if (!File.Exists(DemoScenePath))
+            if (!File.Exists(DemoScenePath) ||
+                !File.ReadAllText(DemoScenePath).Contains(ControllerMenuScriptGuid))
             {
                 EditorApplication.delayCall += () =>
                 {
-                    if (!EditorApplication.isPlayingOrWillChangePlaymode && !File.Exists(DemoScenePath))
+                    if (!EditorApplication.isPlayingOrWillChangePlaymode &&
+                        (!File.Exists(DemoScenePath) ||
+                         !File.ReadAllText(DemoScenePath).Contains(ControllerMenuScriptGuid)))
                     {
                         CreateDemoSceneInternal();
                     }
@@ -75,7 +79,7 @@ namespace Aigf.Companion.Editor
             var manualRoomProvider = CreateRoom(out var sofaNode, out var surface);
             var picoRoomProvider = CreatePicoRoomProvider(manualRoomProvider);
             var avatar = CreateAvatar();
-            var debugUi = CreateDebugUI(camera.transform);
+            var debugUi = CreateDebugUI(camera);
             var bootstrap = new GameObject("CompanionBootstrap").AddComponent<AppBootstrap>();
             bootstrap.gameObject.AddComponent<SherpaVoiceInput>();
             var bootstrapSerialized = new SerializedObject(bootstrap);
@@ -119,6 +123,7 @@ namespace Aigf.Companion.Editor
             xrOrigin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.Floor;
             xrOrigin.CameraYOffset = 1.65f;
             var picoManager = originObject.AddComponent<PXR_Manager>();
+            originObject.AddComponent<PXR_CameraEffectBlock>();
             var picoManagerSerialized = new SerializedObject(picoManager);
             var openMrc = picoManagerSerialized.FindProperty("openMRC");
             if (openMrc != null) openMrc.boolValue = false;
@@ -139,6 +144,7 @@ namespace Aigf.Companion.Editor
             camera.farClipPlane = 30f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+            camera.allowHDR = false;
             cameraObject.AddComponent<AudioListener>();
             var driver = cameraObject.AddComponent<TrackedPoseDriver>();
             var position = new InputAction("HMD Position", binding: "<XRHMD>/centerEyePosition", expectedControlType: "Vector3");
@@ -266,15 +272,16 @@ namespace Aigf.Companion.Editor
             return root;
         }
 
-        private static BrainDebugUI CreateDebugUI(Transform cameraTransform)
+        private static BrainDebugUI CreateDebugUI(Camera camera)
         {
             var canvasObject = new GameObject("CompanionDebugCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
-            canvasObject.transform.SetParent(cameraTransform, false);
-            canvasObject.transform.localPosition = new Vector3(-0.42f, -0.18f, 1.15f);
-            canvasObject.transform.localRotation = Quaternion.identity;
-            canvasObject.transform.localScale = Vector3.one * 0.00055f;
+            canvas.worldCamera = camera;
+            canvasObject.transform.SetParent(null, false);
+            canvasObject.transform.position = new Vector3(0f, 1.45f, 1.15f);
+            canvasObject.transform.rotation = Quaternion.identity;
+            canvasObject.transform.localScale = Vector3.one * 0.0007f;
             canvasObject.GetComponent<RectTransform>().sizeDelta = new Vector2(720f, 990f);
             var scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -315,8 +322,12 @@ namespace Aigf.Companion.Editor
 
             debug.Configure(input, send, status, json, action, state, room, target, error, latency);
 
-            var eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-            eventSystem.transform.SetParent(canvasObject.transform.parent);
+            new GameObject("EventSystem", typeof(EventSystem));
+            var uiRuntime = new GameObject("Companion UI Runtime");
+            var controllerMenu = uiRuntime.AddComponent<PicoControllerMenu>();
+            var xrOrigin = camera.GetComponentInParent<XROrigin>();
+            controllerMenu.Configure(canvas, camera, xrOrigin != null ? xrOrigin.Origin.transform : null);
+            canvasObject.SetActive(false);
             return debug;
         }
 

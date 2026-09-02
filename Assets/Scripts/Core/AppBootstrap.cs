@@ -43,12 +43,12 @@ namespace Aigf.Companion.Core
                     throw new InvalidOperationException("Avatar brain/navigation components are incomplete.");
                 }
 
-                var room = await roomProvider.LoadAsync(destroyCancellationToken);
-                roomNavMeshBuilder?.Rebuild(room);
                 if (passthrough != null)
                 {
                     await passthrough.SetEnabledAsync(true, destroyCancellationToken);
                 }
+                var room = await roomProvider.LoadAsync(destroyCancellationToken);
+                roomNavMeshBuilder?.Rebuild(room);
                 var hmd = userCamera != null ? userCamera.transform : null;
                 navigation.Configure(config, hmd);
                 avatarInteraction?.Configure(config);

@@ -40,6 +40,7 @@ namespace Aigf.Companion.Editor
             PlayerSettings.gpuSkinning = true;
             PlayerSettings.MTRendering = true;
             PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.OpenGLES3 });
+            DisableHdrForPico();
 
             ConfigureXrLoader();
             var project = PXR_ProjectSetting.GetProjectConfig();
@@ -114,6 +115,22 @@ namespace Aigf.Companion.Editor
         {
             var property = target.FindProperty(name);
             if (property != null) property.boolValue = value;
+        }
+
+        private static void DisableHdrForPico()
+        {
+            foreach (var guid in AssetDatabase.FindAssets("t:UniversalRenderPipelineAsset"))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var asset = AssetDatabase.LoadMainAssetAtPath(path);
+                if (asset == null) continue;
+                var serialized = new SerializedObject(asset);
+                var supportsHdr = serialized.FindProperty("m_SupportsHDR");
+                if (supportsHdr == null || !supportsHdr.boolValue) continue;
+                supportsHdr.boolValue = false;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(asset);
+            }
         }
 
         private static void EnsureScriptingDefine(NamedBuildTarget target, string define)
