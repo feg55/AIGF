@@ -116,6 +116,14 @@ namespace Aigf.Companion.Agent
                     return ActionResult.Failure(validationError);
                 }
 
+                if (!actionExecutor.TryPrepare(reply, out var preparationError))
+                {
+                    LastError = preparationError;
+                    Debug.LogWarning($"[AI] Action preparation failed: {preparationError}", this);
+                    DiagnosticsChanged?.Invoke();
+                    return ActionResult.Failure(preparationError);
+                }
+
                 LastModelJson = AgentJson.Serialize(reply, true);
                 if (config.EnableDebugLogs)
                 {

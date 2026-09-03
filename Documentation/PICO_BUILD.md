@@ -33,6 +33,7 @@ The application performs no model download at runtime. If local inference cannot
 
 - Qwen model: `Qwen/Qwen3-0.6B-GGUF`, Q8_0, pinned revision from `model-manifest.json`.
 - llama.cpp: tag `v0.1.2`, commit `1511ce3bc3f087376c8526b4ad07100bfabb277f`.
-- sherpa-onnx native libraries: `1.13.0` for Android ARM64.
+- sherpa-onnx native libraries: `1.13.5` for Android ARM64.
+- offline TTS: Supertonic 3 INT8, Russian, F2 female voice (`sid=6`), 5 generation steps.
 
 Run the full checklist in `Documentation/PICO_DEVICE_TEST.md` on a physical PICO 4 before distribution.

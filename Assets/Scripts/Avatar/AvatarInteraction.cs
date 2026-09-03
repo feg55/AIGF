@@ -244,15 +244,17 @@ namespace Aigf.Companion.Avatar
 
         private Vector3 CalculateStandingPosition(RoomNode seat)
         {
+            if (navigation != null && navigation.TryGetLastRoomDestination(seat, out var lastApproach))
+            {
+                return lastApproach;
+            }
+
             if (seat == null || seat.ApproachPoint == null)
             {
                 return avatarRoot.position;
             }
 
-            var position = Vector3.Lerp(
-                seatedRootReference,
-                seat.ApproachPoint.position,
-                0.55f);
+            var position = seat.ApproachPoint.position;
             position.y = seat.ApproachPoint.position.y;
             return position;
         }

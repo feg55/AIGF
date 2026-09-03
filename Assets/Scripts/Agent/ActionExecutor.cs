@@ -51,6 +51,86 @@ namespace Aigf.Companion.Agent
             return ActionSequenceRunner.RunAsync(reply.Actions, ExecuteOneAsync, cancellationToken);
         }
 
+        public bool TryPrepare(AgentReply reply, out string error)
+        {
+            if (!AgentJson.ValidateReply(reply, room, out error, config != null ? config.MaxActionsPerReply : 5))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < reply.Actions.Count; i++)
+            {
+                var action = reply.Actions[i];
+                if (!AgentSafety.ValidateAction(action, room, out error))
+                {
+                    return false;
+                }
+
+                switch (action.Type)
+                {
+                    case AgentActionTypes.WalkToUser:
+                    case AgentActionTypes.FollowUser:
+                    {
+                        if (!EnsureNavigationReady(out error)) return false;
+                        var distance = action.Type == AgentActionTypes.FollowUser
+                            ? config != null ? config.FollowDistance : 1.2f
+                            : action.Distance;
+                        if (!navigation.TryResolveUserDestination(distance, out _))
+                        {
+                            error = "No reachable floor point exists near the user.";
+                            return false;
+                        }
+                        break;
+                    }
+
+                    case AgentActionTypes.WalkTo:
+                    {
+                        if (!EnsureNavigationReady(out error)) return false;
+                        if (!room.TryGetNode(action.Target, out var node) ||
+                            !navigation.TryResolveRoomDestination(node, out _))
+                        {
+                            error = $"No reachable floor point exists beside '{action.Target}'.";
+                            return false;
+                        }
+                        break;
+                    }
+
+                    case AgentActionTypes.Sit:
+                    {
+                        if (!room.TryGetNode(action.Target, out var seat) || avatarInteraction == null ||
+                            !avatarInteraction.CanSit(seat, out error))
+                        {
+                            if (string.IsNullOrEmpty(error)) error = $"Cannot sit on '{action.Target}'.";
+                            return false;
+                        }
+                        if (!EnsureNavigationReady(out error)) return false;
+                        if (!navigation.TryResolveRoomDestination(seat, out _))
+                        {
+                            error = $"No reachable floor point exists beside seat '{action.Target}'.";
+                            return false;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        private bool EnsureNavigationReady(out string error)
+        {
+            if (navigation == null)
+            {
+                error = "GirlNavigation is missing.";
+                return false;
+            }
+
+            var placement = navigation.EnsurePlacedOnNavMesh();
+            error = placement.Succeeded ? string.Empty : placement.Message;
+            return placement.Succeeded;
+        }
+
         private async Task<ActionResult> ExecuteOneAsync(AgentAction action, CancellationToken cancellationToken)
         {
             if (!AgentSafety.ValidateAction(action, room, out var error))

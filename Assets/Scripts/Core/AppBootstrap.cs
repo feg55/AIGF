@@ -48,9 +48,18 @@ namespace Aigf.Companion.Core
                     await passthrough.SetEnabledAsync(true, destroyCancellationToken);
                 }
                 var room = await roomProvider.LoadAsync(destroyCancellationToken);
-                roomNavMeshBuilder?.Rebuild(room);
                 var hmd = userCamera != null ? userCamera.transform : null;
                 navigation.Configure(config, hmd);
+                navigation.SetNavigationEnabled(false);
+                var navMeshBuilt = roomNavMeshBuilder != null && roomNavMeshBuilder.Rebuild(room);
+                if (navMeshBuilt)
+                {
+                    var placement = navigation.EnsurePlacedOnNavMesh();
+                    if (!placement.Succeeded)
+                    {
+                        Debug.LogError($"[NAV] {placement.Message}", this);
+                    }
+                }
                 avatarInteraction?.Configure(config);
                 lookAtUser?.Configure(hmd);
                 actionExecutor.Configure(room, config);

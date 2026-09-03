@@ -121,8 +121,21 @@ namespace Aigf.Companion.Pico
                 bounds = geometry.GetComponent<Collider>();
             }
 
+            if (geometry == null && IsSeatLabel(label))
+            {
+                geometry = CreateFallbackSeatGeometry(anchorObject.transform, label);
+                bounds = geometry.GetComponent<Collider>();
+                Debug.LogWarning(
+                    $"[PICO] {label} anchor {handle} has no Box3D data; using conservative seat bounds.",
+                    this);
+            }
+
             var approach = CreateApproachPoint(anchorObject.transform, geometry, label);
             var interaction = CreateInteractionAnchor(anchorObject.transform, geometry, approach, label);
+            Debug.Log(
+                $"[PICO] Scene object {handle}: label={label}, geometry={(geometry != null)}, " +
+                $"sittable={(interaction != null)}.",
+                this);
             return new PicoSemanticObject
             {
                 Id = $"pico_{handle}",
@@ -167,6 +180,20 @@ namespace Aigf.Companion.Pico
                 new Vector3(size.x, size.y, planeThickness));
         }
 
+        private Transform CreateFallbackSeatGeometry(Transform parent, PxrSemanticLabel label)
+        {
+            var isSofa = string.Equals(label.ToString(), "Sofa", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(label.ToString(), "Couch", StringComparison.OrdinalIgnoreCase);
+            var size = isSofa
+                ? new Vector3(1.6f, 0.85f, 0.8f)
+                : new Vector3(0.65f, 0.9f, 0.65f);
+            return CreateBoxGeometry(
+                parent,
+                Vector3.up * (size.y * 0.5f),
+                Quaternion.identity,
+                size);
+        }
+
         private static Transform CreateApproachPoint(Transform anchor, Transform geometry, PxrSemanticLabel label)
         {
             var point = new GameObject("ApproachPoint").transform;
@@ -189,12 +216,14 @@ namespace Aigf.Companion.Pico
             Transform approach,
             PxrSemanticLabel label)
         {
-            if (label != PxrSemanticLabel.Sofa && label != PxrSemanticLabel.Chair) return null;
+            if (!IsSeatLabel(label)) return null;
             if (geometry == null || !geometry.TryGetComponent<BoxCollider>(out var collider)) return null;
 
             var objectHeight = Mathf.Abs(collider.size.y);
             var objectDepth = Mathf.Abs(collider.size.z);
-            var seatHeightFromBottom = label == PxrSemanticLabel.Sofa
+            var isSofa = string.Equals(label.ToString(), "Sofa", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(label.ToString(), "Couch", StringComparison.OrdinalIgnoreCase);
+            var seatHeightFromBottom = isSofa
                 ? Mathf.Clamp(objectHeight * 0.45f, 0.38f, 0.52f)
                 : Mathf.Clamp(objectHeight * 0.48f, 0.4f, 0.58f);
             var seatOffset = collider.center + new Vector3(
@@ -209,6 +238,14 @@ namespace Aigf.Companion.Pico
             var interaction = anchor.gameObject.AddComponent<InteractionAnchor>();
             interaction.Configure(approach, sit, sit);
             return interaction;
+        }
+
+        private static bool IsSeatLabel(PxrSemanticLabel label)
+        {
+            var value = label.ToString();
+            return string.Equals(value, "Sofa", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(value, "Couch", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(value, "Chair", StringComparison.OrdinalIgnoreCase);
         }
 #endif
 

@@ -81,7 +81,15 @@ namespace Aigf.Companion.Pico
             }
 
             IsReady = true;
-            Debug.Log($"[PICO] Normalized {Current.Count} Scene Capture objects.", this);
+            var seatCount = 0;
+            for (var i = 0; i < Current.Nodes.Count; i++)
+            {
+                if (Current.Nodes[i] != null && Current.Nodes[i].CanSit) seatCount++;
+            }
+            Debug.Log(
+                $"[PICO] Normalized {Current.Count} Scene Capture objects; " +
+                $"{seatCount} valid seats.",
+                this);
             return Current;
         }
 

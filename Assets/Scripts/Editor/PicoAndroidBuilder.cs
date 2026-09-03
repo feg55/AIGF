@@ -166,11 +166,15 @@ namespace Aigf.Companion.Editor
             RequireVoiceFile("SherpaOnnx/asr-models/sherpa-onnx-whisper-tiny/tiny-encoder.onnx");
             RequireVoiceFile("SherpaOnnx/asr-models/sherpa-onnx-whisper-tiny/tiny-decoder.onnx");
             RequireVoiceFile("SherpaOnnx/vad-models/silero-vad/silero_vad.onnx");
-            RequireVoiceFile("SherpaOnnx/tts-models/vits-piper-ru_RU-irina-medium/ru_RU-irina-medium.onnx");
-
-            Debug.LogWarning(
-                "[BUILD] The bundled Irina TTS model declares its dataset license as Unknown. " +
-                "Replace or legally clear it before commercial distribution.");
+            const string supertonic =
+                "SherpaOnnx/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/";
+            RequireVoiceFile(supertonic + "duration_predictor.int8.onnx");
+            RequireVoiceFile(supertonic + "text_encoder.int8.onnx");
+            RequireVoiceFile(supertonic + "vector_estimator.int8.onnx");
+            RequireVoiceFile(supertonic + "vocoder.int8.onnx");
+            RequireVoiceFile(supertonic + "tts.json");
+            RequireVoiceFile(supertonic + "unicode_indexer.bin");
+            RequireVoiceFile(supertonic + "voice.bin");
         }
 
         private static void RequireVoiceFile(string relativePath)

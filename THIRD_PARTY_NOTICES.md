@@ -46,7 +46,7 @@ available in the upstream source repository.
 
 ## sherpa-onnx and offline speech models
 
-The offline speech runtime uses `k2-fsa/sherpa-onnx` 1.13.0 Android ARM64
+The offline speech runtime uses `k2-fsa/sherpa-onnx` 1.13.5 Android ARM64
 libraries together with the Unity-Sherpa-ONNX integration. sherpa-onnx is
 distributed under the Apache License 2.0; the Unity integration and each
 redistributed model remain subject to their own upstream notices.
@@ -54,8 +54,7 @@ redistributed model remain subject to their own upstream notices.
 The bundled ASR/VAD assets are Whisper Tiny and Silero VAD distributions from
 the official sherpa-onnx model releases.
 
-The bundled Piper `ru_RU-irina-medium` TTS model is suitable for technical
-prototyping, but its upstream `MODEL_CARD` explicitly records the training
-dataset license as `Unknown`. Do not ship that voice commercially until its
-training-data rights have been resolved, or replace it with a Russian voice
-whose model and dataset licenses permit the intended distribution.
+Speech synthesis uses the INT8 release of `Supertone/supertonic-3`. It runs
+locally through ONNX Runtime and is distributed under the OpenRAIL-M model
+license included by the upstream project. The application selects Russian and
+the built-in F2 female voice; no voice cloning is performed.
