@@ -1,0 +1,8 @@
+C:\Users\user\Documents\my_reps\AIGF\AIGF\Temp\bin\Debug\Aigf.Companion.Editor.dll
+C:\Users\user\Documents\my_reps\AIGF\AIGF\Temp\bin\Debug\Aigf.Companion.Editor.pdb
+C:\Users\user\Documents\my_reps\AIGF\AIGF\Temp\bin\Debug\Aigf.Companion.Runtime.pdb
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Companion.Editor.csproj.AssemblyReference.cache
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Companion.Editor.csproj.CoreCompileInputs.cache
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Com.90949E41.Up2Date
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Companion.Editor.dll
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Companion.Editor.pdb

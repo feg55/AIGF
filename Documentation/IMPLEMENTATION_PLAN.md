@@ -35,7 +35,7 @@ Why: PICO 4 needs a small deterministic offline baseline; the strict action boun
 
 ## 5. Offline Russian voice — completed, device validation pending
 
-- Added microphone capture, Silero VAD, Whisper tiny ASR, Russian Irina VITS TTS, and Sherpa ONNX Android ARM64 bindings.
+- Added microphone capture, Silero VAD, Whisper tiny ASR, Russian Supertonic 3 INT8 TTS, and Sherpa ONNX Android ARM64 bindings.
 - Connected synthesized audio to lip sync and retained mocks for diagnostics.
 
 Why: hands-free local conversation is a core AR use case and must not depend on a network service.

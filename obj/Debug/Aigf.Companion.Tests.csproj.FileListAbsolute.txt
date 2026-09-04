@@ -1,0 +1,8 @@
+C:\Users\user\Documents\my_reps\AIGF\AIGF\Temp\bin\Debug\Aigf.Companion.Tests.dll
+C:\Users\user\Documents\my_reps\AIGF\AIGF\Temp\bin\Debug\Aigf.Companion.Tests.pdb
+C:\Users\user\Documents\my_reps\AIGF\AIGF\Temp\bin\Debug\Aigf.Companion.Runtime.pdb
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Companion.Tests.csproj.AssemblyReference.cache
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Companion.Tests.csproj.CoreCompileInputs.cache
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Com.7D4465FA.Up2Date
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Companion.Tests.dll
+C:\Users\user\Documents\my_reps\AIGF\AIGF\obj\Debug\Aigf.Companion.Tests.pdb

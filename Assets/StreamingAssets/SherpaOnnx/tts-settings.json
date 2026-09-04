@@ -21,7 +21,7 @@
       "numThreads": 2,
       "provider": "cpu",
       "allowInt8": true,
-      "speakerId": 6,
+      "speakerId": 1,
       "speed": 1.08,
       "ruleFsts": "",
       "ruleFars": "",

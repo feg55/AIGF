@@ -313,6 +313,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Aigf.Companion.Runtime::Aigf.Companion.Voice.SherpaTtsAdapter
   voiceSource: {fileID: 0}
+  speakerId: 1
+  generationSteps: 5
+  speechSpeed: 1.08
+  language: ru
 --- !u!1001 &1243574424237804419
 PrefabInstance:
   m_ObjectHideFlags: 0

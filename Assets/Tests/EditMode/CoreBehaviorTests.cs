@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Aigf.Companion.AI;
 using Aigf.Companion.Agent;
+using Aigf.Companion.Pico;
 using Aigf.Companion.Room;
 using NUnit.Framework;
 using UnityEngine;
@@ -27,6 +28,30 @@ namespace Aigf.Companion.Tests
             var graph = new RoomGraph(new[] { node });
             Assert.That(graph.TryGetNode("SOFA_1", out var found), Is.True);
             Assert.That(found, Is.SameAs(node));
+        }
+
+        [Test]
+        public void RoomGraphCanRefreshInPlace()
+        {
+            var graph = new RoomGraph(new[] { CreateNode("old_sofa", RoomNodeType.Sofa) });
+            graph.Clear();
+            var table = CreateNode("new_table", RoomNodeType.Table);
+
+            Assert.That(graph.AddOrReplace(table, out var error), Is.True, error);
+            Assert.That(graph.Count, Is.EqualTo(1));
+            Assert.That(graph.TryGetNode("old_sofa", out _), Is.False);
+            Assert.That(graph.TryGetNode("new_table", out var found), Is.True);
+            Assert.That(found, Is.SameAs(table));
+        }
+
+        [TestCase("Sofa", RoomNodeType.Sofa)]
+        [TestCase("couch", RoomNodeType.Sofa)]
+        [TestCase("Virtual_Wall", RoomNodeType.Wall)]
+        [TestCase("Washing Machine", RoomNodeType.OtherFurniture)]
+        [TestCase("Refrigerator", RoomNodeType.OtherFurniture)]
+        public void PicoSemanticLabelsMapToRoomTypes(string label, RoomNodeType expected)
+        {
+            Assert.That(PicoRoomProvider.MapType(label), Is.EqualTo(expected));
         }
 
         [Test]

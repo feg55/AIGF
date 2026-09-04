@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Aigf.Companion.Agent;
+using Aigf.Companion.Room;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -119,7 +120,7 @@ namespace Aigf.Companion.UI
             Set(modelJsonText, $"Last JSON:\n{brain.LastModelJson}");
             Set(actionText, $"Action: {(executor != null ? executor.CurrentAction : string.Empty)}");
             Set(stateText, $"State: {brain.CurrentState}");
-            Set(roomText, $"Room nodes: {(brain.Room != null ? brain.Room.Count : 0)}");
+            Set(roomText, BuildRoomStatus(brain.Room));
             Set(targetText, $"Target: {(executor != null ? executor.CurrentTarget : string.Empty)}");
             Set(errorText, $"Last error: {brain.LastError}");
             Set(latencyText, $"Inference: {brain.LastInferenceMilliseconds} ms");
@@ -128,6 +129,32 @@ namespace Aigf.Companion.UI
         private static void Set(Text target, string value)
         {
             if (target != null) target.text = value;
+        }
+
+        private static string BuildRoomStatus(RoomGraph room)
+        {
+            if (room == null) return "Room: unavailable";
+            var sofas = 0;
+            var seats = 0;
+            var furniture = 0;
+            for (var i = 0; i < room.Nodes.Count; i++)
+            {
+                var node = room.Nodes[i];
+                if (node == null) continue;
+                if (node.Type == RoomNodeType.Sofa) sofas++;
+                if (node.CanSit) seats++;
+                if (node.Type == RoomNodeType.Sofa ||
+                    node.Type == RoomNodeType.Chair ||
+                    node.Type == RoomNodeType.Table ||
+                    node.Type == RoomNodeType.Bed ||
+                    node.Type == RoomNodeType.Cabinet ||
+                    node.Type == RoomNodeType.OtherFurniture)
+                {
+                    furniture++;
+                }
+            }
+
+            return $"Room: {room.Count} | furniture: {furniture} | sofas: {sofas} | seats: {seats}";
         }
     }
 }

@@ -2,7 +2,8 @@
   "name": "Aigf.Companion.PlayModeTests",
   "rootNamespace": "Aigf.Companion.Tests",
   "references": [
-    "Aigf.Companion.Runtime"
+    "Aigf.Companion.Runtime",
+    "Unity.AI.Navigation"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

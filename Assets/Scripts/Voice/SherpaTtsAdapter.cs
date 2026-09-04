@@ -15,7 +15,8 @@ namespace Aigf.Companion.Voice
     {
         [SerializeField] private AudioSource voiceSource;
         [Header("Offline neural voice")]
-        [SerializeField, Range(0, 9)] private int speakerId = 6;
+        // voice.bin is packed as F1..F5,M1..M5. F2 is deliberately bright and feminine.
+        [SerializeField, Range(0, 9)] private int speakerId = 1;
         [SerializeField, Range(2, 12)] private int generationSteps = 5;
         [SerializeField, Range(0.75f, 1.35f)] private float speechSpeed = 1.08f;
         [SerializeField] private string language = "ru";
@@ -25,6 +26,8 @@ namespace Aigf.Companion.Voice
         private readonly SemaphoreSlim generationGate = new SemaphoreSlim(1, 1);
         private AudioClip activeClip;
         private CancellationTokenSource playbackCancellation;
+        private volatile bool disposeDirectWhenIdle;
+        private static int cancelNativeGeneration;
 
         public bool IsReady => directTts != null || service != null && service.IsReady;
         public string LastError { get; private set; } = string.Empty;
@@ -52,6 +55,7 @@ namespace Aigf.Companion.Voice
 
         private void OnDestroy()
         {
+            disposeDirectWhenIdle = true;
             Stop();
             service?.Dispose();
             service = null;
@@ -61,7 +65,6 @@ namespace Aigf.Companion.Voice
                 directTts = null;
                 generationGate.Release();
             }
-            generationGate.Dispose();
         }
 
         public async Task SpeakAsync(string text, CancellationToken cancellationToken = default)
@@ -112,6 +115,7 @@ namespace Aigf.Companion.Voice
 
         public void Stop()
         {
+            Volatile.Write(ref cancelNativeGeneration, 1);
             playbackCancellation?.Cancel();
             playbackCancellation?.Dispose();
             playbackCancellation = null;
@@ -163,6 +167,7 @@ namespace Aigf.Companion.Voice
             {
                 var engine = directTts;
                 if (engine == null) return default;
+                Volatile.Write(ref cancelNativeGeneration, 0);
                 var configuredLanguage = string.IsNullOrWhiteSpace(language) ? "ru" : language.Trim();
                 return await Task.Run(() =>
                 {
@@ -191,6 +196,11 @@ namespace Aigf.Companion.Voice
             }
             finally
             {
+                if (disposeDirectWhenIdle)
+                {
+                    directTts?.Dispose();
+                    directTts = null;
+                }
                 generationGate.Release();
             }
         }
@@ -198,7 +208,7 @@ namespace Aigf.Companion.Voice
         [AOT.MonoPInvokeCallback(typeof(OfflineTtsCallbackProgressWithArg))]
         private static int ContinueGeneration(IntPtr samples, int count, float progress, IntPtr argument)
         {
-            return 1;
+            return Volatile.Read(ref cancelNativeGeneration) == 0 ? 1 : 0;
         }
 
         private readonly struct GeneratedAudio

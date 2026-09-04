@@ -22,6 +22,7 @@ namespace Aigf.Companion.Room
             : approachPoint;
         public Transform InteractionPoint => interactionPoint != null ? interactionPoint : transform;
         public InteractionAnchor InteractionAnchor => interactionAnchor;
+        public Collider BoundsSource => boundsSource;
         public string SemanticMetadata => semanticMetadata ?? string.Empty;
         public Bounds Bounds => boundsSource != null
             ? boundsSource.bounds

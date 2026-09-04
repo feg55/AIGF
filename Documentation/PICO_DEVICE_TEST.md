@@ -1,5 +1,7 @@
 # PICO 4 device acceptance checklist
 
+Target device: regular PICO 4 on OS 5.13.x. The project supports the legacy PICO 4 Scene Capture API as well as the newer scene-data update event.
+
 Record headset firmware, APK commit, room, battery state, and ambient temperature with each run.
 
 ## Install and startup
@@ -14,6 +16,7 @@ Record headset firmware, APK commit, room, battery state, and ambient temperatur
 
 - [ ] Captured floor height matches the real floor within 5 cm.
 - [ ] Walls, doors, windows, tables, sofas, and beds have the correct semantic type and usable bounds.
+- [ ] After adding or changing a captured sofa, diagnostics updates to `sofas: 1` (or more) and `seats: 1` without restarting the app.
 - [ ] The avatar never routes through a wall or solid furniture.
 - [ ] `come here` stops at the configured personal distance and never enters the user's guardian boundary.
 - [ ] Follow mode replans smoothly, stops on command, and does not oscillate near the user.

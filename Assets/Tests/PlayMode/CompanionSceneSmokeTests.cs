@@ -2,8 +2,11 @@ using System.Collections;
 using System.Threading.Tasks;
 using Aigf.Companion.Agent;
 using Aigf.Companion.Core;
+using Aigf.Companion.Room;
 using NUnit.Framework;
+using Unity.AI.Navigation;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
@@ -11,6 +14,24 @@ namespace Aigf.Companion.Tests
 {
     public sealed class CompanionSceneSmokeTests
     {
+        [Test]
+        public void EmptyRoomStillBuildsFallbackNavigationFloor()
+        {
+            var root = new GameObject("Fallback NavMesh Test");
+            var surface = root.AddComponent<NavMeshSurface>();
+            var builder = root.AddComponent<RoomNavMeshBuilder>();
+            try
+            {
+                Assert.That(builder.Rebuild(new RoomGraph()), Is.True);
+                Assert.That(NavMesh.CalculateTriangulation().vertices.Length, Is.GreaterThanOrEqualTo(3));
+            }
+            finally
+            {
+                surface.RemoveData();
+                Object.DestroyImmediate(root);
+            }
+        }
+
         [UnityTest]
         [Timeout(30000)]
         public IEnumerator GeneratedSceneExecutesCoreMockCommands()

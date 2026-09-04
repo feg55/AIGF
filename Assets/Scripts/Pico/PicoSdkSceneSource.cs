@@ -15,12 +15,36 @@ namespace Aigf.Companion.Pico
         [SerializeField, Min(0.01f)] private float planeThickness = 0.04f;
 
         private bool providerStarted;
+        private bool sceneUpdateSubscribed;
 
         public bool IsSceneCaptureAvailable => Application.platform == RuntimePlatform.Android;
+        public event Action SceneDataChanged;
+
+        private void OnEnable()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (!sceneUpdateSubscribed)
+            {
+                PXR_Manager.SceneAnchorDataUpdated += HandleSceneAnchorDataUpdated;
+#pragma warning disable CS0618 // Legacy PICO 4 / OS 5.13 Scene Capture event.
+                PXR_Manager.SpatialSceneCaptured += HandleSpatialSceneCaptured;
+#pragma warning restore CS0618
+                sceneUpdateSubscribed = true;
+            }
+#endif
+        }
+
+        private void OnDisable()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            UnsubscribeFromSceneUpdates();
+#endif
+        }
 
         private void OnDestroy()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
+            UnsubscribeFromSceneUpdates();
             if (providerStarted)
             {
                 PXR_MixedReality.StopSenseDataProvider(PxrSenseDataProviderType.SceneCapture);
@@ -33,25 +57,28 @@ namespace Aigf.Companion.Pico
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
             EnsureGeneratedRoot();
-            ClearGeneratedObjects();
             PXR_Manager.EnableVideoSeeThrough = true;
 
-            var start = await PXR_MixedReality.StartSenseDataProvider(
-                PxrSenseDataProviderType.SceneCapture,
-                cancellationToken);
-            if (start != PxrResult.SUCCESS)
+            if (!providerStarted)
             {
-                throw new InvalidOperationException($"PICO Scene Capture provider failed to start: {start}");
+                var start = await PXR_MixedReality.StartSenseDataProvider(
+                    PxrSenseDataProviderType.SceneCapture,
+                    cancellationToken);
+                if (start != PxrResult.SUCCESS)
+                {
+                    throw new InvalidOperationException($"PICO Scene Capture provider failed to start: {start}");
+                }
+
+                providerStarted = true;
             }
 
-            providerStarted = true;
-            var query = await QueryAnchorsAsync(cancellationToken);
+            var query = await QueryRoomAnchorsAsync(cancellationToken);
             if (query.result == PxrResult.SUCCESS && query.handles.Count == 0 && launchCaptureWhenRoomMissing)
             {
                 var capture = await PXR_MixedReality.StartSceneCaptureAsync(cancellationToken);
                 if (capture == PxrResult.SUCCESS)
                 {
-                    query = await QueryAnchorsAsync(cancellationToken);
+                    query = await QueryRoomAnchorsAsync(cancellationToken);
                 }
             }
 
@@ -60,6 +87,8 @@ namespace Aigf.Companion.Pico
                 throw new InvalidOperationException($"PICO Scene Capture query failed: {query.result}");
             }
 
+            // Do not destroy the last valid room until a replacement query succeeds.
+            ClearGeneratedObjects();
             var result = new List<PicoSemanticObject>(query.handles.Count);
             for (var i = 0; i < query.handles.Count; i++)
             {
@@ -78,13 +107,64 @@ namespace Aigf.Companion.Pico
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        private static async Task<(PxrResult result, List<ulong> handles)> QueryAnchorsAsync(
+        private static async Task<(PxrResult result, List<ulong> handles)> QueryRoomAnchorsAsync(
             CancellationToken cancellationToken)
         {
-            var query = await PXR_MixedReality.QuerySceneAnchorAsync(
+            var all = await PXR_MixedReality.QuerySceneAnchorAsync(
                 (PxrSemanticLabel[])null,
                 cancellationToken);
-            return (query.result, query.anchorHandleList ?? new List<ulong>());
+            var handles = all.anchorHandleList ?? new List<ulong>();
+
+            // PICO 4 OS 5.13 uses the legacy Scene Capture backend. Furniture shares
+            // the Object flag, and some builds also omit Floor from an unfiltered
+            // query. A filtered request for both flags makes the navigation floor and
+            // Sofa/Table/Chair anchors available; the real type still comes from
+            // GetSceneSemanticLabel.
+            var requiredRoomGeometry = await PXR_MixedReality.QuerySceneAnchorAsync(
+                new[] { PxrSemanticLabel.Floor, PxrSemanticLabel.Sofa },
+                cancellationToken);
+            if (requiredRoomGeometry.result == PxrResult.SUCCESS &&
+                requiredRoomGeometry.anchorHandleList != null)
+            {
+                var unique = new HashSet<ulong>(handles);
+                for (var i = 0; i < requiredRoomGeometry.anchorHandleList.Count; i++)
+                {
+                    var handle = requiredRoomGeometry.anchorHandleList[i];
+                    if (unique.Add(handle)) handles.Add(handle);
+                }
+            }
+
+            // On the legacy backend either query can fail independently. Keep a
+            // successful filtered result instead of discarding it merely because the
+            // broad query failed first.
+            var result = all.result == PxrResult.SUCCESS
+                ? all.result
+                : requiredRoomGeometry.result;
+            return (result, handles);
+        }
+
+        private void HandleSceneAnchorDataUpdated()
+        {
+            SceneDataChanged?.Invoke();
+        }
+
+        private void HandleSpatialSceneCaptured(PxrEventSpatialSceneCaptured capture)
+        {
+            if (capture.result == PxrResult.SUCCESS &&
+                capture.status == PxrSpatialSceneCaptureStatus.NewCaptureResult)
+            {
+                SceneDataChanged?.Invoke();
+            }
+        }
+
+        private void UnsubscribeFromSceneUpdates()
+        {
+            if (!sceneUpdateSubscribed) return;
+            PXR_Manager.SceneAnchorDataUpdated -= HandleSceneAnchorDataUpdated;
+#pragma warning disable CS0618 // Legacy PICO 4 / OS 5.13 Scene Capture event.
+            PXR_Manager.SpatialSceneCaptured -= HandleSpatialSceneCaptured;
+#pragma warning restore CS0618
+            sceneUpdateSubscribed = false;
         }
 
         private PicoSemanticObject CreateSemanticObject(ulong handle)

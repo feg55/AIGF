@@ -20,11 +20,12 @@ namespace Aigf.Companion.Pico
     public interface IPicoSceneSource
     {
         bool IsSceneCaptureAvailable { get; }
+        event Action SceneDataChanged;
         Task<IReadOnlyList<PicoSemanticObject>> QuerySemanticObjectsAsync(
             CancellationToken cancellationToken);
     }
 
-    public sealed class PicoRoomProvider : MonoBehaviour, IRoomProvider
+    public sealed class PicoRoomProvider : MonoBehaviour, IRoomProvider, IRoomUpdateSource
     {
         [Tooltip("PICO Scene Capture adapter used by the production scene.")]
         [SerializeField] private MonoBehaviour picoSceneSourceComponent;
@@ -32,6 +33,20 @@ namespace Aigf.Companion.Pico
 
         public bool IsReady { get; private set; }
         public RoomGraph Current { get; private set; }
+        public event Action<RoomGraph> RoomUpdated;
+
+        private IPicoSceneSource subscribedSource;
+        private bool refreshRunning;
+        private bool refreshQueued;
+
+        private void OnDestroy()
+        {
+            if (subscribedSource != null)
+            {
+                subscribedSource.SceneDataChanged -= HandleSceneDataChanged;
+                subscribedSource = null;
+            }
+        }
 
         public async Task<RoomGraph> LoadAsync(CancellationToken cancellationToken = default)
         {
@@ -66,11 +81,17 @@ namespace Aigf.Companion.Pico
             catch (Exception exception)
             {
                 Debug.LogError($"[PICO] Scene Capture failed; room actions are disabled: {exception.Message}", this);
-                Current = new RoomGraph();
+                if (Current == null) Current = new RoomGraph();
                 IsReady = true;
+                SubscribeToUpdates(source);
                 return Current;
             }
-            Current = new RoomGraph();
+
+            // Keep the RoomGraph instance stable. GirlBrain and ActionExecutor retain this
+            // reference, so in-place replacement makes newly discovered furniture visible
+            // to planning and safety without reinitializing the whole application.
+            if (Current == null) Current = new RoomGraph();
+            else Current.Clear();
             if (semanticObjects != null)
             {
                 for (var i = 0; i < semanticObjects.Count; i++)
@@ -81,16 +102,62 @@ namespace Aigf.Companion.Pico
             }
 
             IsReady = true;
+            SubscribeToUpdates(source);
             var seatCount = 0;
+            var floorCount = 0;
             for (var i = 0; i < Current.Nodes.Count; i++)
             {
-                if (Current.Nodes[i] != null && Current.Nodes[i].CanSit) seatCount++;
+                var node = Current.Nodes[i];
+                if (node == null) continue;
+                if (node.CanSit) seatCount++;
+                if (node.Type == RoomNodeType.Floor) floorCount++;
             }
             Debug.Log(
                 $"[PICO] Normalized {Current.Count} Scene Capture objects; " +
-                $"{seatCount} valid seats.",
+                $"{floorCount} floors, {seatCount} valid seats.",
                 this);
             return Current;
+        }
+
+        private void SubscribeToUpdates(IPicoSceneSource source)
+        {
+            if (ReferenceEquals(subscribedSource, source)) return;
+            if (subscribedSource != null)
+            {
+                subscribedSource.SceneDataChanged -= HandleSceneDataChanged;
+            }
+
+            subscribedSource = source;
+            subscribedSource.SceneDataChanged += HandleSceneDataChanged;
+        }
+
+        private async void HandleSceneDataChanged()
+        {
+            refreshQueued = true;
+            if (refreshRunning) return;
+
+            refreshRunning = true;
+            try
+            {
+                do
+                {
+                    refreshQueued = false;
+                    var room = await LoadAsync(destroyCancellationToken);
+                    RoomUpdated?.Invoke(room);
+                }
+                while (refreshQueued && !destroyCancellationToken.IsCancellationRequested);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[PICO] Scene Capture refresh failed: {exception.Message}", this);
+            }
+            finally
+            {
+                refreshRunning = false;
+            }
         }
 
         private void AddSemanticObject(PicoSemanticObject source)
@@ -126,10 +193,17 @@ namespace Aigf.Companion.Pico
 
         public static RoomNodeType MapType(string label)
         {
-            switch ((label ?? string.Empty).Trim().ToLowerInvariant())
+            var normalized = (label ?? string.Empty)
+                .Trim()
+                .Replace("_", string.Empty)
+                .Replace("-", string.Empty)
+                .Replace(" ", string.Empty)
+                .ToLowerInvariant();
+            switch (normalized)
             {
                 case "floor": return RoomNodeType.Floor;
                 case "wall": return RoomNodeType.Wall;
+                case "virtualwall": return RoomNodeType.Wall;
                 case "sofa":
                 case "couch": return RoomNodeType.Sofa;
                 case "chair": return RoomNodeType.Chair;
@@ -138,6 +212,14 @@ namespace Aigf.Companion.Pico
                 case "cabinet": return RoomNodeType.Cabinet;
                 case "door": return RoomNodeType.Door;
                 case "window": return RoomNodeType.Window;
+                case "curtain":
+                case "plant":
+                case "screen":
+                case "refrigerator":
+                case "washingmachine":
+                case "airconditioner":
+                case "lamp":
+                case "wallart": return RoomNodeType.OtherFurniture;
                 default: return RoomNodeType.Unknown;
             }
         }

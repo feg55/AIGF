@@ -27,7 +27,9 @@ Unity stays authoritative over NavMesh sampling/reachability, personal distance,
 
 ## PICO room and navigation
 
-`PicoSdkSceneSource` queries PICO spatial anchors, semantic labels, poses, bounds, and polygons after Scene Capture. `PicoRoomProvider` converts them into stable `RoomNode` records. Seats receive explicit approach and sit transforms. `RoomNavMeshBuilder` rebuilds navigation from captured floor and obstacle colliders.
+`PicoSdkSceneSource` queries PICO spatial anchors, semantic labels, poses, bounds, and polygons after Scene Capture. On a regular PICO 4 with OS 5.13.x it uses the SDK's legacy MR path and also performs a filtered object-anchor query because sofas, tables, and chairs share the legacy `Object` scene flag. `PicoRoomProvider` converts results into stable `RoomNode` records and refreshes the same `RoomGraph` instance after either the legacy `SpatialSceneCaptured` event or the newer `SceneAnchorDataUpdated` event. Seats receive explicit approach and sit transforms. Each refresh cancels stale movement and rebuilds navigation from captured floor and obstacle colliders.
+
+Speech output is fully offline. `SherpaTtsAdapter` loads the INT8 Supertonic 3 model through sherpa-onnx, selects Russian plus the bright F2 female voice (`sid=1` in sherpa's alphabetically packed `voice.bin`), and uses a small flow-step count suitable for the PICO 4 CPU. The legacy Piper/Irina assets are not included in the project or APK.
 
 If device room data is unavailable, the Android build fails safely with an empty room graph. Generated room geometry is an Editor-only fallback and is disabled on Android.
 
@@ -47,7 +49,7 @@ The prompt uses Qwen chat control tokens, `/no_think`, compact room facts, a bou
 
 ## Offline voice
 
-`SherpaVoiceInput` uses the microphone, Silero VAD, and Whisper tiny Russian ASR. `SherpaTtsAdapter` synthesizes Russian speech using the Irina VITS voice. Profiles and model assets are bundled under `Assets/StreamingAssets/SherpaOnnx`; no cloud service is called. The underlying `IVad`, `IStt`, and `ITts` boundaries still allow deterministic mocks for Editor diagnostics.
+`SherpaVoiceInput` uses the microphone, Silero VAD, and Whisper tiny Russian ASR. `SherpaTtsAdapter` synthesizes Russian speech using the Supertonic 3 INT8 F2 voice (`sid=1`). Profiles and model assets are bundled under `Assets/StreamingAssets/SherpaOnnx`; no cloud service is called. The underlying `IVad`, `IStt`, and `ITts` boundaries still allow deterministic mocks for Editor diagnostics.
 
 ## Memory and privacy
 

@@ -462,6 +462,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Aigf.Companion.Runtime::Aigf.Companion.Room.RoomNavMeshBuilder
   surface: {fileID: 0}
+  navigationFloorThickness: 0.06
+  minimumFallbackFloorSize: 4
 --- !u!114 &404139177
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -521,9 +523,9 @@ MonoBehaviour:
   m_IgnoreNavMeshObstacle: 1
   m_OverrideTileSize: 0
   m_TileSize: 256
-  m_OverrideVoxelSize: 0
-  m_VoxelSize: 0.16666667
-  m_MinRegionArea: 2
+  m_OverrideVoxelSize: 1
+  m_VoxelSize: 0.08
+  m_MinRegionArea: 0.25
   m_NavMeshData: {fileID: 0}
   m_BuildHeightMesh: 0
 --- !u!114 &404139180

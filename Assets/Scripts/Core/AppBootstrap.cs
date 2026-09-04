@@ -27,7 +27,18 @@ namespace Aigf.Companion.Core
         [SerializeField] private MonoBehaviour ttsComponent;
         [SerializeField] private BrainDebugUI debugUI;
 
+        private IRoomUpdateSource roomUpdateSource;
+
         public bool IsInitialized { get; private set; }
+
+        private void OnDestroy()
+        {
+            if (roomUpdateSource != null)
+            {
+                roomUpdateSource.RoomUpdated -= HandleRoomUpdated;
+                roomUpdateSource = null;
+            }
+        }
 
         private async void Start()
         {
@@ -79,6 +90,11 @@ namespace Aigf.Companion.Core
                 brain.SetMemoryStore(memoryStore);
 
                 debugUI?.Bind(brain);
+                roomUpdateSource = roomProvider as IRoomUpdateSource;
+                if (roomUpdateSource != null)
+                {
+                    roomUpdateSource.RoomUpdated += HandleRoomUpdated;
+                }
                 IsInitialized = true;
                 Debug.Log("[AI] Companion bootstrap complete.", this);
             }
@@ -89,6 +105,30 @@ namespace Aigf.Companion.Core
             {
                 Debug.LogError($"[AI] Bootstrap failed: {exception}", this);
             }
+        }
+
+        private void HandleRoomUpdated(RoomGraph room)
+        {
+            if (room == null || !IsInitialized) return;
+
+            // Captured geometry changed. Cancel movement planned against stale
+            // furniture, rebuild navigation, then publish the refreshed graph.
+            brain?.CancelActiveRequest();
+            navigation?.Stop();
+            navigation?.SetNavigationEnabled(false);
+            var navMeshBuilt = roomNavMeshBuilder != null && roomNavMeshBuilder.Rebuild(room);
+            if (navMeshBuilt && navigation != null)
+            {
+                var placement = navigation.EnsurePlacedOnNavMesh();
+                if (!placement.Succeeded)
+                {
+                    Debug.LogError($"[NAV] {placement.Message}", this);
+                }
+            }
+
+            actionExecutor?.Configure(room, config);
+            brain?.UpdateRoom(room);
+            Debug.Log($"[PICO] Applied refreshed room with {room.Count} semantic nodes.", this);
         }
 
         private async System.Threading.Tasks.Task<ILocalLLM> CreateLlmAsync(AppConfig appConfig)

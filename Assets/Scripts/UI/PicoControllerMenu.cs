@@ -63,7 +63,7 @@ namespace Aigf.Companion.UI
             AcquireControllerIfNeeded();
 
             var primaryPressed = ReadButton(CommonUsages.primaryButton);
-#if UNITY_EDITOR
+#if UNITY_EDITOR && ENABLE_LEGACY_INPUT_MANAGER
             primaryPressed |= Input.GetKey(KeyCode.M);
 #endif
             if (primaryPressed && !primaryWasPressed) ToggleMenu();

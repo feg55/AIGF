@@ -238,19 +238,13 @@ namespace Aigf.Companion.Avatar
             }
 
             preferredDirection.Normalize();
-            var candidates = new List<Vector3>(9)
-            {
-                userGround + preferredDirection * distance
-            };
-            for (var i = 1; i < 8; i++)
-            {
-                var angle = (i % 2 == 1 ? 1f : -1f) * ((i + 1) / 2) * 45f;
-                var direction = Quaternion.Euler(0f, angle, 0f) * preferredDirection;
-                candidates.Add(userGround + direction * distance);
-            }
+            var candidates = new List<Vector3>(49);
+            AddRadialCandidates(candidates, userGround, preferredDirection, distance, 16);
+            AddRadialCandidates(candidates, userGround, preferredDirection, Mathf.Max(0.45f, distance * 0.7f), 16);
+            AddRadialCandidates(candidates, userGround, preferredDirection, distance + 0.35f, 16);
             candidates.Add(userGround);
 
-            return TryResolveBestReachable(candidates, Mathf.Max(SampleRadius, 1.1f), out resolvedPosition);
+            return TryResolveBestReachable(candidates, Mathf.Max(SampleRadius, 0.55f), out resolvedPosition);
         }
 
         public bool TryResolveRoomDestination(RoomNode node, out Vector3 resolvedPosition)
@@ -262,30 +256,49 @@ namespace Aigf.Companion.Avatar
             }
 
             var bounds = node.Bounds;
-            var floorY = bounds.min.y;
-            var candidates = new List<Vector3>(9);
+            var floorY = transform.position.y;
+            var center = new Vector3(bounds.center.x, floorY, bounds.center.z);
+            var candidates = new List<Vector3>(49);
+            var preferredDirection = transform.position - center;
+            preferredDirection.y = 0f;
             if (node.ApproachPoint != null)
             {
-                candidates.Add(node.ApproachPoint.position);
-                floorY = node.ApproachPoint.position.y;
+                var approach = node.ApproachPoint.position;
+                approach.y = floorY;
+                candidates.Add(approach);
+                preferredDirection = approach - center;
+                preferredDirection.y = 0f;
             }
 
-            var forward = node.Anchor != null ? node.Anchor.forward : Vector3.forward;
-            forward.y = 0f;
-            if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
-            forward.Normalize();
-            var clearance = (navMeshAgent != null ? navMeshAgent.radius : 0.25f) +
-                            (config != null ? config.FurnitureMargin : 0.3f) + 0.12f;
-            var center = new Vector3(bounds.center.x, floorY, bounds.center.z);
-            for (var i = 0; i < 8; i++)
+            if (preferredDirection.sqrMagnitude < 0.001f)
             {
-                var direction = Quaternion.Euler(0f, i * 45f, 0f) * forward;
-                var support = Mathf.Abs(direction.x) * bounds.extents.x +
-                              Mathf.Abs(direction.z) * bounds.extents.z;
-                candidates.Add(center + direction * (support + clearance));
+                preferredDirection = node.Anchor != null ? node.Anchor.forward : Vector3.forward;
+                preferredDirection.y = 0f;
+            }
+            if (preferredDirection.sqrMagnitude < 0.001f) preferredDirection = Vector3.forward;
+            preferredDirection.Normalize();
+
+            var clearance = (navMeshAgent != null ? navMeshAgent.radius : 0.25f) +
+                            (config != null ? config.FurnitureMargin : 0.3f) + 0.08f;
+            for (var ring = 0; ring < 3; ring++)
+            {
+                var extraClearance = ring * 0.25f;
+                for (var i = 0; i < 16; i++)
+                {
+                    var angle = AlternatingAngle(i, 16);
+                    var direction = Quaternion.Euler(0f, angle, 0f) * preferredDirection;
+                    var support = Mathf.Abs(direction.x) * bounds.extents.x +
+                                  Mathf.Abs(direction.z) * bounds.extents.z;
+                    candidates.Add(center + direction * (support + clearance + extraClearance));
+                }
             }
 
-            return TryResolveBestReachable(candidates, Mathf.Max(SampleRadius, 1.25f), out resolvedPosition);
+            return TryResolveBestReachableOutsideBounds(
+                candidates,
+                Mathf.Max(0.4f, Mathf.Min(SampleRadius, 0.75f)),
+                bounds,
+                (navMeshAgent != null ? navMeshAgent.radius : 0.25f) + 0.03f,
+                out resolvedPosition);
         }
 
         public bool TryGetLastRoomDestination(RoomNode node, out Vector3 resolvedPosition)
@@ -429,6 +442,39 @@ namespace Aigf.Companion.Avatar
             float sampleRadius,
             out Vector3 resolvedPosition)
         {
+            return TryResolveBestReachableInternal(
+                requestedPositions,
+                sampleRadius,
+                false,
+                default,
+                0f,
+                out resolvedPosition);
+        }
+
+        private bool TryResolveBestReachableOutsideBounds(
+            IReadOnlyList<Vector3> requestedPositions,
+            float sampleRadius,
+            Bounds blockedBounds,
+            float clearance,
+            out Vector3 resolvedPosition)
+        {
+            return TryResolveBestReachableInternal(
+                requestedPositions,
+                sampleRadius,
+                true,
+                blockedBounds,
+                clearance,
+                out resolvedPosition);
+        }
+
+        private bool TryResolveBestReachableInternal(
+            IReadOnlyList<Vector3> requestedPositions,
+            float sampleRadius,
+            bool rejectBlockedBounds,
+            Bounds blockedBounds,
+            float clearance,
+            out Vector3 resolvedPosition)
+        {
             resolvedPosition = transform.position;
             var bestLength = float.PositiveInfinity;
             var found = false;
@@ -436,13 +482,15 @@ namespace Aigf.Companion.Avatar
             {
                 var requested = requestedPositions[i];
                 if (!TrySamplePosition(requested, sampleRadius, 0.65f, out var sampled) ||
+                    rejectBlockedBounds && !IsOutsideHorizontalBounds(sampled, blockedBounds, clearance) ||
                     !TryCalculateCompletePath(sampled, out var pathLength))
                 {
                     continue;
                 }
 
-                // Keep the preferred first candidate unless another route is substantially shorter.
-                var preferencePenalty = i * 0.15f;
+                // Direction preference is useful, but accessibility and path length
+                // must win when PICO reports an unreliable furniture orientation.
+                var preferencePenalty = Mathf.Min(i * 0.02f, 0.3f);
                 var score = pathLength + preferencePenalty;
                 if (score >= bestLength) continue;
                 bestLength = score;
@@ -462,7 +510,8 @@ namespace Aigf.Companion.Avatar
             }
 
             var path = new NavMeshPath();
-            if (!NavMesh.CalculatePath(transform.position, destination, AreaMask, path) ||
+            var start = navMeshAgent != null ? navMeshAgent.nextPosition : transform.position;
+            if (!NavMesh.CalculatePath(start, destination, AreaMask, path) ||
                 path.status != NavMeshPathStatus.PathComplete || path.corners.Length == 0)
             {
                 return false;
@@ -473,6 +522,38 @@ namespace Aigf.Companion.Avatar
                 pathLength += Vector3.Distance(path.corners[i - 1], path.corners[i]);
             }
             return true;
+        }
+
+        private static void AddRadialCandidates(
+            ICollection<Vector3> candidates,
+            Vector3 center,
+            Vector3 preferredDirection,
+            float radius,
+            int directionCount)
+        {
+            for (var i = 0; i < directionCount; i++)
+            {
+                var direction = Quaternion.Euler(0f, AlternatingAngle(i, directionCount), 0f) *
+                                preferredDirection;
+                candidates.Add(center + direction * radius);
+            }
+        }
+
+        private static float AlternatingAngle(int index, int directionCount)
+        {
+            if (index == 0) return 0f;
+            var step = 360f / Mathf.Max(1, directionCount);
+            var magnitude = (index + 1) / 2;
+            return (index % 2 == 1 ? 1f : -1f) * magnitude * step;
+        }
+
+        private static bool IsOutsideHorizontalBounds(Vector3 point, Bounds bounds, float clearance)
+        {
+            var nearestX = Mathf.Clamp(point.x, bounds.min.x, bounds.max.x);
+            var nearestZ = Mathf.Clamp(point.z, bounds.min.z, bounds.max.z);
+            var deltaX = point.x - nearestX;
+            var deltaZ = point.z - nearestZ;
+            return deltaX * deltaX + deltaZ * deltaZ >= clearance * clearance;
         }
 
         private bool TrySampleNearUser(float radius, out Vector3 position)

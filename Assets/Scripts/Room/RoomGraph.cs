@@ -56,6 +56,12 @@ namespace Aigf.Companion.Room
             return true;
         }
 
+        public void Clear()
+        {
+            nodes.Clear();
+            byId.Clear();
+        }
+
         public bool TryGetNode(string id, out RoomNode node)
         {
             if (string.IsNullOrWhiteSpace(id))

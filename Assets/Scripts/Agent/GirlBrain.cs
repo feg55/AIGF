@@ -40,11 +40,23 @@ namespace Aigf.Companion.Agent
 
         private void OnDestroy()
         {
-            activeRequest?.Cancel();
+            CancelActiveRequest();
             activeRequest?.Dispose();
             activeRequest = null;
-            tts?.Stop();
             if (localLlm is IDisposable disposable) disposable.Dispose();
+        }
+
+        public void CancelActiveRequest()
+        {
+            activeRequest?.Cancel();
+            tts?.Stop();
+        }
+
+        public void UpdateRoom(RoomGraph roomGraph)
+        {
+            if (roomGraph == null) return;
+            room = roomGraph;
+            DiagnosticsChanged?.Invoke();
         }
 
         public void Initialize(
@@ -116,14 +128,6 @@ namespace Aigf.Companion.Agent
                     return ActionResult.Failure(validationError);
                 }
 
-                if (!actionExecutor.TryPrepare(reply, out var preparationError))
-                {
-                    LastError = preparationError;
-                    Debug.LogWarning($"[AI] Action preparation failed: {preparationError}", this);
-                    DiagnosticsChanged?.Invoke();
-                    return ActionResult.Failure(preparationError);
-                }
-
                 LastModelJson = AgentJson.Serialize(reply, true);
                 if (config.EnableDebugLogs)
                 {
@@ -149,6 +153,16 @@ namespace Aigf.Companion.Agent
                     {
                         speaking = false;
                     }
+                }
+
+                // A missing route must never make the companion appear deaf. Speak first,
+                // then reject only the physical action if the current room is not navigable.
+                if (!actionExecutor.TryPrepare(reply, out var preparationError))
+                {
+                    LastError = preparationError;
+                    Debug.LogWarning($"[AI] Action preparation failed after speech: {preparationError}", this);
+                    DiagnosticsChanged?.Invoke();
+                    return ActionResult.Failure(preparationError);
                 }
 
                 var result = await actionExecutor.ExecuteAsync(reply, token);

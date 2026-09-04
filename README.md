@@ -4,9 +4,7 @@ Offline mixed-reality companion built with Unity `6000.3.23f1`, PICO Integration
 
 Open `Assets/Scenes/CompanionMR.unity`. In the Editor the app falls back to the deterministic planner because the llama.cpp plugin is Android-only. On PICO 4 it uses the bundled Qwen3 GGUF, Russian voice recognition/synthesis, passthrough and Scene Capture.
 
-Build from **AIGF > Build PICO 4 Release APK**. The output is `Builds/MintARCompanion.apk`. Git LFS is required for GGUF, ONNX and native `.so` files.
-
-Release note: the bundled Russian Irina TTS voice has an upstream `Unknown` dataset license and must be replaced or legally cleared before commercial distribution. See `THIRD_PARTY_NOTICES.md`.
+Build from **AIGF > Build PICO 4 Release APK**. The output is `Builds/MintARCompanion.apk`. Git LFS is required for GGUF, ONNX and native `.so` files. Speech synthesis uses the bundled Supertonic 3 INT8 neural voice; the previous Piper/Irina model is no longer shipped.
 
 See:
 

@@ -17,10 +17,17 @@ namespace Aigf.Companion.Editor
         private const long MinimumIncrementalBuildFreeDiskBytes = 6L * 1024L * 1024L * 1024L;
         private const string NativePluginPath =
             "Assets/Plugins/Android/arm64-v8a/libgirlfriend_ai.so";
+        private const string SupertonicProfile =
+            "sherpa-onnx-supertonic-3-tts-int8-2026-05-11";
+        private const string LegacyPiperDirectory =
+            "Assets/StreamingAssets/SherpaOnnx/tts-models/vits-piper-ru_RU-irina-medium";
+        private const string RebuildVoiceManifestMenu =
+            "Tools/SherpaOnnx/Rebuild StreamingAssets Manifest";
 
         [MenuItem("AIGF/Validate PICO Release")]
         public static void ValidateFromMenu()
         {
+            RebuildVoiceManifest();
             ValidateReleaseAssets();
             Debug.Log("[BUILD] PICO release assets are valid.");
         }
@@ -41,6 +48,7 @@ namespace Aigf.Companion.Editor
             }
 
             PicoProjectConfigurator.ConfigureForAutomation();
+            RebuildVoiceManifest();
             ValidateReleaseAssets();
             ValidateFreeDiskSpace();
 
@@ -86,6 +94,15 @@ namespace Aigf.Companion.Editor
                 $"Not enough free disk space for the Android build. " +
                 $"Free at least {required / (1024L * 1024L * 1024L)} GiB on {driveRoot} and retry; " +
                 $"currently available: {available / (1024f * 1024f * 1024f):0.0} GiB.");
+        }
+
+        private static void RebuildVoiceManifest()
+        {
+            if (!EditorApplication.ExecuteMenuItem(RebuildVoiceManifestMenu))
+            {
+                throw new BuildFailedException(
+                    $"Could not run Sherpa-ONNX manifest command: {RebuildVoiceManifestMenu}");
+            }
         }
 
         public static void ValidateReleaseAssets()
@@ -163,11 +180,21 @@ namespace Aigf.Companion.Editor
             RequireVoiceFile("SherpaOnnx/vad-settings.json");
             RequireVoiceFile("SherpaOnnx/tts-settings.json");
             RequireVoiceFile("SherpaOnnx/microphone-settings.json");
+            RequireText(
+                "Assets/StreamingAssets/SherpaOnnx/tts-settings.json",
+                $"\"profileName\": \"{SupertonicProfile}\"");
+            RequireText(
+                "Assets/StreamingAssets/SherpaOnnx/tts-settings.json",
+                "\"modelType\": 6");
+            if (Directory.Exists(LegacyPiperDirectory))
+            {
+                throw new BuildFailedException(
+                    "Legacy Piper TTS is still present and would unnecessarily inflate the APK.");
+            }
             RequireVoiceFile("SherpaOnnx/asr-models/sherpa-onnx-whisper-tiny/tiny-encoder.onnx");
             RequireVoiceFile("SherpaOnnx/asr-models/sherpa-onnx-whisper-tiny/tiny-decoder.onnx");
             RequireVoiceFile("SherpaOnnx/vad-models/silero-vad/silero_vad.onnx");
-            const string supertonic =
-                "SherpaOnnx/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/";
+            var supertonic = $"SherpaOnnx/tts-models/{SupertonicProfile}/";
             RequireVoiceFile(supertonic + "duration_predictor.int8.onnx");
             RequireVoiceFile(supertonic + "text_encoder.int8.onnx");
             RequireVoiceFile(supertonic + "vector_estimator.int8.onnx");
