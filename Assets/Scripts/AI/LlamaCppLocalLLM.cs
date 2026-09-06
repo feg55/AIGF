@@ -31,6 +31,7 @@ namespace Aigf.Companion.AI
         {
             try
             {
+                Debug.Log("[MODEL] Reading bundled model manifest.");
                 var manifest = await LocalModelPathResolver.LoadBundledManifestAsync(cancellationToken);
                 if (!string.Equals(manifest.Filename, config.ModelFilename, StringComparison.Ordinal))
                 {
@@ -38,6 +39,7 @@ namespace Aigf.Companion.AI
                     return false;
                 }
 
+                Debug.Log("[MODEL] Verifying local GGUF installation.");
                 var install = await LocalModelPathResolver.EnsureRuntimeModelAvailableAsync(manifest, cancellationToken);
                 if (!install.Succeeded)
                 {
@@ -46,6 +48,7 @@ namespace Aigf.Companion.AI
                     return false;
                 }
 
+                Debug.Log($"[MODEL] Loading Qwen: context={config.ContextSize}, threads={config.Threads}.");
                 var result = await Task.Run(() => Native.gf_init(
                     install.ModelPath,
                     config.ContextSize,
@@ -58,11 +61,12 @@ namespace Aigf.Companion.AI
                 }
 
                 nativeInitialized = true;
+                Debug.Log("[MODEL] Qwen local ready.");
                 return true;
             }
             catch (DllNotFoundException exception)
             {
-                LastError = $"libgirlfriend_ai is missing: {exception.Message}";
+                LastError = $"Cannot load libgirlfriend_ai or its libc++_shared dependency: {exception.Message}";
                 return false;
             }
             catch (EntryPointNotFoundException exception)
@@ -86,14 +90,16 @@ namespace Aigf.Companion.AI
             await inferenceGate.WaitAsync(cancellationToken);
             try
             {
+                if (!IsReady) throw new ObjectDisposedException(nameof(LlamaCppLocalLLM));
                 var prompt = promptBuilder.Build(userMessage, context);
+                if (config.EnableDebugLogs) Debug.Log($"[LLM] Generation started: promptChars={prompt.Length}, maxTokens={config.MaxTokens}.");
                 using (cancellationToken.Register(RequestNativeCancellation))
                 {
                     var nativeResult = await Task.Run(() => GenerateNative(prompt), CancellationToken.None);
                     cancellationToken.ThrowIfCancellationRequested();
                     if (nativeResult.Code != 0)
                     {
-                        throw new InvalidOperationException($"Native generation failed with code {nativeResult.Code}.");
+                        throw new InvalidOperationException($"Native generation failed ({nativeResult.Code}): {DescribeNativeError(nativeResult.Code)}");
                     }
 
                     LastRawOutput = nativeResult.Json;
@@ -107,6 +113,7 @@ namespace Aigf.Companion.AI
             }
             finally
             {
+                if (disposed) ShutdownNative();
                 inferenceGate.Release();
             }
         }
@@ -115,14 +122,34 @@ namespace Aigf.Companion.AI
         {
             if (disposed) return;
             disposed = true;
+            RequestNativeCancellation();
+            // Never block Unity's main thread behind an in-flight native decode.
+            if (!inferenceGate.Wait(0)) return;
+            try { ShutdownNative(); }
+            finally { inferenceGate.Release(); }
+        }
+
+        private static string DescribeNativeError(int code) => code switch
+        {
+            -1 => "Model is not initialized or request arguments are invalid.",
+            -3 => "Conversation exceeds the model context window.",
+            -4 => "Prompt tokenization failed.",
+            -5 => "Cannot allocate the inference context.",
+            -6 => "Model decode failed.",
+            -7 => "Response exceeds the output buffer.",
+            -8 => "Generation was cancelled.",
+            -9 => "Cannot initialize the JSON grammar.",
+            _ => "Unknown native bridge error."
+        };
+
+        private void ShutdownNative()
+        {
             if (nativeInitialized)
             {
                 try { Native.gf_shutdown(); }
                 catch (Exception exception) { Debug.LogWarning($"[LLM] Native shutdown failed: {exception.Message}"); }
                 nativeInitialized = false;
             }
-
-            inferenceGate.Dispose();
         }
 
         private NativeResult GenerateNative(string prompt)

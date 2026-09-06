@@ -18,6 +18,20 @@ int32_t g_context_size = 2048;
 int32_t g_threads = 4;
 bool g_backend_initialized = false;
 
+// Only the response shape is constrained. Speech remains freely generated;
+// Unity still validates action types and room targets before execution.
+const char * reply_grammar = R"gbnf(
+root ::= "{" ws "\"speech\"" ws ":" ws speech ws "," ws "\"emotion\"" ws ":" ws emotion ws "," ws "\"actions\"" ws ":" ws "[" ws (action (ws "," ws action){0,4})? ws "]" ws "}" ws
+speech ::= "\"" char{1,200} "\""
+emotion ::= "\"" ("neutral" | "warm" | "happy" | "curious" | "sad") "\""
+action ::= "{" ws "\"type\"" ws ":" ws kind (ws "," ws "\"target\"" ws ":" ws identifier)? (ws "," ws "\"distance\"" ws ":" ws number)? (ws "," ws "\"animation\"" ws ":" ws identifier)? ws "}"
+kind ::= "\"" ("walk_to_user" | "walk_to" | "sit" | "stand" | "follow_user" | "stop" | "look_at_user" | "look_at" | "wave" | "play_animation") "\""
+identifier ::= "\"" [a-zA-Z0-9_-]{0,64} "\""
+number ::= [0-9] ("." [0-9]{1,2})?
+char ::= [^"\\\x00-\x1F] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F]{4})
+ws ::= [ \t\n\r]{0,4}
+)gbnf";
+
 bool abort_callback(void *) {
     return g_cancelled.load(std::memory_order_relaxed);
 }
@@ -154,6 +168,13 @@ int32_t gf_generate(
 
     llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
     llama_sampler * sampler = llama_sampler_chain_init(sampler_params);
+    auto * grammar = llama_sampler_init_grammar(vocab, reply_grammar, "root");
+    if (grammar == nullptr) {
+        llama_sampler_free(sampler);
+        llama_free(context);
+        return -9;
+    }
+    llama_sampler_chain_add(sampler, grammar);
     llama_sampler_chain_add(sampler, llama_sampler_init_top_p(std::clamp(top_p, 0.1f, 1.0f), 1));
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(std::clamp(temperature, 0.0f, 2.0f)));
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));

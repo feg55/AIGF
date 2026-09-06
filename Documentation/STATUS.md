@@ -1,5 +1,17 @@
 # Status
 
+## Current verification: 2026-09-05
+
+See `FIXES_2026-09-05.md` for the current implementation and device findings.
+EditMode passes 29/29, PlayMode passes 2/2, and real native Qwen inference passes
+on the connected PICO 4. The older baseline below is retained as historical
+context; its license blocker and procedural-animation description are outdated.
+Unity tests/builds work with access to the installed licensing service outside
+the restricted sandbox. The project now uses authored Humanoid clips and
+Supertonic 3 INT8 TTS.
+Release APK 0.2.1 (version code 3) is built at `Builds/MintARCompanion.apk`,
+including the previously missing native C++ runtime.
+
 ## Implemented
 
 - production PICO MR scene with XR origin, tracked camera, passthrough, Scene Capture, semantic room mapping, and runtime NavMesh;

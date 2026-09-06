@@ -44,6 +44,9 @@ the Apache License 2.0. The application bundles the `Q8_0` GGUF file unchanged.
 llama.cpp is distributed under the MIT License; its dependency notices remain
 available in the upstream source repository.
 
+The Android APK also bundles the matching Android NDK `libc++_shared.so`
+(LLVM libc++, Apache License 2.0 with LLVM exceptions) required by this bridge.
+
 ## sherpa-onnx and offline speech models
 
 The offline speech runtime uses `k2-fsa/sherpa-onnx` 1.13.5 Android ARM64

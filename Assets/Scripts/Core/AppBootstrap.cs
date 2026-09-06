@@ -75,11 +75,10 @@ namespace Aigf.Companion.Core
                 lookAtUser?.Configure(hmd);
                 actionExecutor.Configure(room, config);
 
-                var llm = await CreateLlmAsync(config);
                 var memoryStore = new LocalMemoryStore();
                 var memoryRetriever = new MemoryRetriever(memoryStore);
                 brain.Initialize(
-                    llm,
+                    null,
                     ttsComponent as ITts,
                     actionExecutor,
                     room,
@@ -96,6 +95,14 @@ namespace Aigf.Companion.Core
                     roomUpdateSource.RoomUpdated += HandleRoomUpdated;
                 }
                 IsInitialized = true;
+                Debug.Log("[AI] Room and direct commands ready; loading conversation model.", this);
+                var llm = await CreateLlmAsync(config);
+                if (destroyCancellationToken.IsCancellationRequested)
+                {
+                    (llm as IDisposable)?.Dispose();
+                    return;
+                }
+                brain.SetLanguageModel(llm);
                 Debug.Log("[AI] Companion bootstrap complete.", this);
             }
             catch (OperationCanceledException)
@@ -133,7 +140,7 @@ namespace Aigf.Companion.Core
 
         private async System.Threading.Tasks.Task<ILocalLLM> CreateLlmAsync(AppConfig appConfig)
         {
-            if (appConfig.UseMockLLM)
+            if (appConfig.UseMockLLM || (Application.isEditor && appConfig.FallBackToMockWhenModelUnavailable))
             {
                 return new MockLocalLLM();
             }
@@ -145,14 +152,17 @@ namespace Aigf.Companion.Core
             }
 
             var error = native.LastError;
-            native.Dispose();
-            if (appConfig.FallBackToMockWhenModelUnavailable)
+            if (Application.isEditor && appConfig.FallBackToMockWhenModelUnavailable)
             {
+                native.Dispose();
                 Debug.LogWarning($"[MODEL] Native local LLM unavailable; using mock. {error}", this);
                 return new MockLocalLLM();
             }
 
-            throw new InvalidOperationException($"Local model initialization failed: {error}");
+            // Preserve the real error in the bound diagnostics UI. A failed model
+            // must never masquerade as a ready chatbot backed by canned commands.
+            Debug.LogError($"[MODEL] Local model initialization failed: {error}", this);
+            return native;
         }
 
         private void ResolveSceneReferences()

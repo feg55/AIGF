@@ -10,7 +10,7 @@ debug UI -----------------------------------+-> GirlBrain
                                                -> ActionExecutor whitelist
                                                -> navigation / interaction / animation
 
-reply text -> Sherpa VITS TTS -> AudioSource -> amplitude lip sync
+reply text -> Supertonic 3 INT8 TTS -> AudioSource -> amplitude lip sync
 PICO Scene Capture -> semantic RoomGraph -> runtime NavMesh -> safe targets
 local memory -----------------------------------------------> prompt context
 ```
@@ -37,7 +37,7 @@ Passthrough is isolated behind `IPicoPassthroughBackend`; the concrete backend d
 
 ## Avatar
 
-The Mint root owns navigation, interaction, brain, speech, and animation components. The imported humanoid FBX keeps only deforming bones and supplies LOD0/LOD1/LOD2. `GirlAnimator` exposes centralized, safe animation operations; `ProceduralAvatarMotion` supplies a fallback when an authored controller/clip is missing. `MintFacialDriver`, `LookAtUser`, and `AvatarLipSync` handle blink, head/eye attention, and speech amplitude.
+The Mint root owns navigation, interaction, brain, speech, and animation components. The imported humanoid FBX keeps only deforming bones and supplies LOD0/LOD1/LOD2. `GirlAnimator` drives authored Quaternius Humanoid clips through `CompanionAnimationPlayer`; `ProceduralAvatarMotion` is a compatibility shim. The Animator always evaluates bone transforms because seating reads the hips even outside the camera view. `MintFacialDriver`, `LookAtUser`, and `AvatarLipSync` handle blink, head/eye attention, and speech amplitude.
 
 ## Local inference
 
@@ -45,11 +45,13 @@ The canonical GGUF is in `Assets/StreamingAssets/Models`. Android copies it once
 
 `LlamaCppLocalLLM` serializes native access, runs generation away from the Unity main thread, forwards cancellation to the llama abort callback, and decodes UTF-8 bytes explicitly. The native boundary contains only `gf_init`, `gf_generate`, `gf_cancel`, and `gf_shutdown`.
 
-The prompt uses Qwen chat control tokens, `/no_think`, compact room facts, a bounded recent dialogue, and retrieved local memories. Output remains subject to the strict parser and executor boundary.
+The prompt uses Qwen chat control tokens, `/no_think` plus an empty thinking prefix, compact room facts, a bounded recent dialogue, and retrieved local memories. The model can answer ordinary conversation with an empty action list. A native GBNF grammar constrains JSON structure; output remains subject to the strict parser and executor boundary. Android packages the matching NDK `libc++_shared.so` alongside the bridge and shows initialization errors without switching to mock commands. Editor mock mode is explicitly labelled.
 
 ## Offline voice
 
 `SherpaVoiceInput` uses the microphone, Silero VAD, and Whisper tiny Russian ASR. `SherpaTtsAdapter` synthesizes Russian speech using the Supertonic 3 INT8 F2 voice (`sid=1`). Profiles and model assets are bundled under `Assets/StreamingAssets/SherpaOnnx`; no cloud service is called. The underlying `IVad`, `IStt`, and `ITts` boundaries still allow deterministic mocks for Editor diagnostics.
+
+VAD is drained after each window, including silence. Left-controller X toggles mute and a peripheral HMD mic indicator. Mute and app suspension reset pending audio instead of flushing it into recognition; a capture version discards late ASR results. Capture resumes after ASR and ignores synthesized playback. Recognized text, mic level, and capture errors are exposed in diagnostics.
 
 ## Memory and privacy
 

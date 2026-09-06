@@ -26,9 +26,14 @@ namespace Aigf.Companion.Agent
         private AppConfig config;
         private CancellationTokenSource activeRequest;
         private bool speaking;
+        private bool generating;
+        private float requestStartedAt;
 
-        public bool IsReady => localLlm != null && localLlm.IsReady && actionExecutor != null;
-        public string LlmStatus => localLlm == null ? "Not configured" : localLlm.IsReady ? "Ready" : "Unavailable";
+        public bool CanProcessInput => config != null && room != null && actionExecutor != null;
+        public bool IsReady => CanProcessInput && localLlm != null && localLlm.IsReady;
+        public string LlmStatus => localLlm == null ? "Loading model; commands available" :
+            localLlm is MockLocalLLM ? "Demo commands (no neural conversation)" :
+            localLlm.IsReady ? generating ? $"Qwen generating · {Time.realtimeSinceStartup - requestStartedAt:0}s" : "Qwen local · Ready" : "Qwen unavailable; commands available";
         public string LastModelJson { get; private set; } = string.Empty;
         public string LastError { get; private set; } = string.Empty;
         public long LastInferenceMilliseconds { get; private set; }
@@ -77,6 +82,7 @@ namespace Aigf.Companion.Agent
             avatarRoot = agentTransform != null ? agentTransform : transform;
             config = appConfig != null ? appConfig : AppConfig.CreateRuntimeDefaults();
             memoryRetriever = retriever;
+            if (llm is LlamaCppLocalLLM native && !native.IsReady) LastError = native.LastError;
             DiagnosticsChanged?.Invoke();
         }
 
@@ -86,39 +92,73 @@ namespace Aigf.Companion.Agent
             memoryRetriever = store != null ? new MemoryRetriever(store) : null;
         }
 
-        public async Task<ActionResult> ProcessUserMessageAsync(
+        public void SetLanguageModel(ILocalLLM llm)
+        {
+            localLlm = llm;
+            if (llm is LlamaCppLocalLLM native && !native.IsReady) LastError = native.LastError;
+            DiagnosticsChanged?.Invoke();
+        }
+
+        public Task<ActionResult> ProcessCommandAsync(CompanionCommand command, CancellationToken token = default)
+        {
+            return ProcessRequestAsync(command.ToString(), DirectCommand.Create(command, room), token);
+        }
+
+        public Task<ActionResult> ProcessUserMessageAsync(
             string userMessage,
             CancellationToken cancellationToken = default)
+        {
+            DirectCommand.TryParse(userMessage, room, out var command);
+            return ProcessRequestAsync(userMessage, command, cancellationToken);
+        }
+
+        private async Task<ActionResult> ProcessRequestAsync(
+            string userMessage, AgentReply command, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(userMessage))
             {
                 return ActionResult.Failure("User message is empty.");
             }
 
-            if (!IsReady)
+            if (!CanProcessInput || (command == null && !IsReady))
             {
-                LastError = "Brain is not ready.";
+                LastError = localLlm is LlamaCppLocalLLM native ? native.LastError : "Conversation model is loading. Movement commands are available after room loading.";
+                Debug.LogWarning($"[AI] Input rejected: {LastError}", this);
                 DiagnosticsChanged?.Invoke();
                 return ActionResult.Failure(LastError);
             }
 
             activeRequest?.Cancel();
             activeRequest?.Dispose();
-            activeRequest = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var token = activeRequest.Token;
+            var request = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, destroyCancellationToken);
+            activeRequest = request;
+            var token = request.Token;
             tts?.Stop();
+            speaking = false;
+            generating = false;
 
             try
             {
                 LastError = string.Empty;
-                var memories = memoryRetriever != null
-                    ? await memoryRetriever.RetrieveAsync(userMessage, 4, token)
-                    : (IReadOnlyList<MemoryItem>)Array.Empty<MemoryItem>();
-                var context = BuildContext(memories);
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                var reply = await localLlm.GenerateAsync(userMessage.Trim(), context, token);
-                stopwatch.Stop();
-                LastInferenceMilliseconds = stopwatch.ElapsedMilliseconds;
+                LastInferenceMilliseconds = 0;
+                Debug.Log($"[AI] {(command != null ? "Direct command" : "Conversation")}: {userMessage}", this);
+                var reply = command;
+                if (reply == null)
+                {
+                    generating = true;
+                    requestStartedAt = Time.realtimeSinceStartup;
+                    DiagnosticsChanged?.Invoke();
+                    var memories = memoryRetriever != null
+                        ? await memoryRetriever.RetrieveAsync(userMessage, 4, token)
+                        : (IReadOnlyList<MemoryItem>)Array.Empty<MemoryItem>();
+                    var context = BuildContext(memories);
+                    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                    reply = await localLlm.GenerateAsync(userMessage.Trim(), context, token);
+                    token.ThrowIfCancellationRequested();
+                    stopwatch.Stop();
+                    LastInferenceMilliseconds = stopwatch.ElapsedMilliseconds;
+                    generating = false;
+                }
 
                 if (!AgentJson.ValidateReply(reply, room, out var validationError, config.MaxActionsPerReply))
                 {
@@ -131,7 +171,7 @@ namespace Aigf.Companion.Agent
                 LastModelJson = AgentJson.Serialize(reply, true);
                 if (config.EnableDebugLogs)
                 {
-                    Debug.Log($"[LLM] {LastInferenceMilliseconds} ms\n{LastModelJson}", this);
+                    Debug.Log($"[{(command != null ? "COMMAND" : "LLM")}] {LastInferenceMilliseconds} ms\n{LastModelJson}", this);
                 }
 
                 var avatarAnimator = avatarRoot != null ? avatarRoot.GetComponentInChildren<Avatar.GirlAnimator>() : null;
@@ -151,7 +191,7 @@ namespace Aigf.Companion.Agent
                     }
                     finally
                     {
-                        speaking = false;
+                        if (ReferenceEquals(activeRequest, request)) speaking = false;
                     }
                 }
 
@@ -166,6 +206,7 @@ namespace Aigf.Companion.Agent
                 }
 
                 var result = await actionExecutor.ExecuteAsync(reply, token);
+                Debug.Log($"[AI] Request result: success={result.Succeeded}; {result.Message}", this);
                 if (result.Succeeded)
                 {
                     RememberTurn(userMessage.Trim(), reply.Speech);
@@ -193,8 +234,13 @@ namespace Aigf.Companion.Agent
             }
             finally
             {
-                speaking = false;
-                DiagnosticsChanged?.Invoke();
+                if (ReferenceEquals(activeRequest, request))
+                {
+                    speaking = false;
+                    generating = false;
+                    DiagnosticsChanged?.Invoke();
+                }
+                else request.Dispose();
             }
         }
 

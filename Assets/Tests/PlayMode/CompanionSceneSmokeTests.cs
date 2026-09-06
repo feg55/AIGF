@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Aigf.Companion.Agent;
 using Aigf.Companion.Core;
 using Aigf.Companion.Room;
+using Aigf.Companion.Voice;
 using NUnit.Framework;
 using Unity.AI.Navigation;
 using UnityEngine;
@@ -36,6 +37,9 @@ namespace Aigf.Companion.Tests
         [Timeout(30000)]
         public IEnumerator GeneratedSceneExecutesCoreMockCommands()
         {
+            // This suite exercises scene navigation and authored motion. Android
+            // speech plugins are tested on the headset, not loaded in Windows.
+            SceneManager.sceneLoaded += DisableDeviceSpeech;
             SceneManager.LoadScene("CompanionMR", LoadSceneMode.Single);
             yield return null;
 
@@ -72,6 +76,19 @@ namespace Aigf.Companion.Tests
             yield return WaitFor(sit, 12f);
             Assert.That(sit.Result.Succeeded, Is.True, sit.Result.Message);
             Assert.That(brain.CurrentState, Is.EqualTo(AgentState.Sitting));
+            yield return new WaitForSeconds(0.3f);
+            Assert.That(Vector3.Dot(brain.transform.up, Vector3.up), Is.GreaterThan(0.99f));
+            var humanoid = brain.GetComponentInChildren<Animator>();
+            if (humanoid != null && humanoid.isHuman)
+            {
+                var thigh = humanoid.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
+                var knee = humanoid.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
+                Debug.Log($"[TEST SEAT] knee={brain.transform.InverseTransformVector(knee.position - thigh.position)} " +
+                    $"hips={brain.transform.InverseTransformPoint(humanoid.GetBoneTransform(HumanBodyBones.Hips).position)} " +
+                    $"visualRotation={humanoid.transform.localEulerAngles} culling={humanoid.cullingMode}");
+                Assert.That(Vector3.Dot(knee.position - thigh.position, brain.transform.forward), Is.GreaterThan(0.1f),
+                    "Seated knees must extend in the avatar's facing direction.");
+            }
 
             var stand = brain.ProcessUserMessageAsync("stand up");
             yield return WaitFor(stand, 5f);
@@ -91,6 +108,13 @@ namespace Aigf.Companion.Tests
             var look = brain.ProcessUserMessageAsync("look at me");
             yield return WaitFor(look, 3f);
             Assert.That(look.Result.Succeeded, Is.True, look.Result.Message);
+        }
+
+        private static void DisableDeviceSpeech(Scene scene, LoadSceneMode mode)
+        {
+            SceneManager.sceneLoaded -= DisableDeviceSpeech;
+            foreach (var input in Object.FindObjectsByType<SherpaVoiceInput>(FindObjectsSortMode.None)) input.enabled = false;
+            foreach (var tts in Object.FindObjectsByType<SherpaTtsAdapter>(FindObjectsSortMode.None)) tts.enabled = false;
         }
 
         private static IEnumerator WaitFor(Task<ActionResult> task, float timeoutSeconds)

@@ -98,6 +98,7 @@ namespace Aigf.Companion.Voice
             }
 
             voiceSource.clip = activeClip;
+            var playingClip = activeClip;
             voiceSource.Play();
             try
             {
@@ -109,7 +110,7 @@ namespace Aigf.Companion.Voice
             }
             finally
             {
-                ReleaseClip();
+                if (activeClip == playingClip) ReleaseClip();
             }
         }
 

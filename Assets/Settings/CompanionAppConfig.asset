@@ -15,8 +15,8 @@ MonoBehaviour:
   useMockLLM: 0
   fallBackToMockWhenModelUnavailable: 1
   modelFilename: qwen3-0.6b-q8_0.gguf
-  contextSize: 2048
-  maxTokens: 128
+  contextSize: 4096
+  maxTokens: 384
   threads: 4
   temperature: 0.35
   topP: 0.9

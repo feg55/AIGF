@@ -26,8 +26,8 @@ namespace Aigf.Companion.Editor
             PlayerSettings.companyName = "AIGF";
             PlayerSettings.productName = "Mint AR Companion";
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.aigf.mintcompanion");
-            PlayerSettings.bundleVersion = "0.2.0";
-            PlayerSettings.Android.bundleVersionCode = 2;
+            PlayerSettings.bundleVersion = "0.2.2";
+            PlayerSettings.Android.bundleVersionCode = 4;
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel29;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.Android.applicationEntry = AndroidApplicationEntry.Activity;

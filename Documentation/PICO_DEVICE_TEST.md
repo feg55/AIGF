@@ -34,6 +34,11 @@ Record headset firmware, APK commit, room, battery state, and ambient temperatur
 ## Conversation
 
 - [ ] Russian near-field speech is recognized in quiet and typical household noise.
+- [ ] A single spoken phrase followed by silence appears under `Heard` without needing a second phrase.
+- [ ] Left X toggles the peripheral mic icon; holding X does not toggle repeatedly. Right A still opens the menu.
+- [ ] Muting halfway through a phrase discards it; unmuting after recognition started does not submit the discarded phrase.
+- [ ] Mute survives headset sleep/resume and controller reconnection. Permission denial shows an unavailable mic; retry with X after granting permission.
+- [ ] Diagnostics says `Qwen local · Ready`, with nonzero inference time, and answers ordinary questions with no physical action.
 - [ ] VAD does not continuously trigger on synthesized speech; echo behavior is acceptable.
 - [ ] A new utterance cancels obsolete generation, speech, and actions.
 - [ ] Qwen returns valid strict JSON for at least 50 varied commands; invalid output produces no unsafe action.

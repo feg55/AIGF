@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Aigf.Companion.Agent;
 using Aigf.Companion.Room;
+using Aigf.Companion.Voice;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -22,6 +23,7 @@ namespace Aigf.Companion.UI
 
         private GirlBrain brain;
         private float nextRefresh;
+        private SherpaVoiceInput voice;
 
         private void Awake()
         {
@@ -58,12 +60,24 @@ namespace Aigf.Companion.UI
             RunCommand(command);
         }
 
-        public void SendComeHere() => RunCommand("come here");
-        public void SendSit() => RunCommand("sit on the sofa");
-        public void SendStand() => RunCommand("stand up");
-        public void SendFollow() => RunCommand("follow me");
-        public void SendStop() => RunCommand("stop");
-        public void SendWave() => RunCommand("wave");
+        public void SendComeHere() => RunDirectCommand(CompanionCommand.ComeHere);
+        public void SendSit() => RunDirectCommand(CompanionCommand.Sit);
+        public void SendStand() => RunDirectCommand(CompanionCommand.Stand);
+        public void SendFollow() => RunDirectCommand(CompanionCommand.Follow);
+        public void SendStop() => RunDirectCommand(CompanionCommand.Stop);
+        public void SendWave() => RunDirectCommand(CompanionCommand.Wave);
+
+        private async void RunDirectCommand(CompanionCommand command)
+        {
+            try
+            {
+                if (brain == null) brain = FindAnyObjectByType<GirlBrain>();
+                if (brain != null) await brain.ProcessCommandAsync(command, destroyCancellationToken);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception exception) { Debug.LogError($"[AI] Menu command failed: {exception}", this); }
+            finally { Refresh(); }
+        }
 
         public void Configure(
             InputField input,
@@ -109,6 +123,7 @@ namespace Aigf.Companion.UI
 
         private void Refresh()
         {
+            if (voice == null) voice = FindAnyObjectByType<SherpaVoiceInput>();
             if (brain == null)
             {
                 Set(llmStatusText, "LLM: waiting for bootstrap");
@@ -117,7 +132,8 @@ namespace Aigf.Companion.UI
 
             var executor = brain.Executor;
             Set(llmStatusText, $"LLM: {brain.LlmStatus}");
-            Set(modelJsonText, $"Last JSON:\n{brain.LastModelJson}");
+            var voiceStatus = voice != null ? $"Mic (X): {voice.Status}\nLevel: {voice.InputLevel:0.000} | Heard: {voice.LastTranscript}\n\n" : "Mic: missing\n";
+            Set(modelJsonText, $"{voiceStatus}Last JSON:\n{brain.LastModelJson}");
             Set(actionText, $"Action: {(executor != null ? executor.CurrentAction : string.Empty)}");
             Set(stateText, $"State: {brain.CurrentState}");
             Set(roomText, BuildRoomStatus(brain.Room));

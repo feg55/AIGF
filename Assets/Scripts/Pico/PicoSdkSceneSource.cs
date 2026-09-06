@@ -280,12 +280,10 @@ namespace Aigf.Companion.Pico
             point.SetParent(anchor, false);
             if (geometry != null && geometry.TryGetComponent<BoxCollider>(out var collider))
             {
-                var localOffset = collider.center + new Vector3(
-                    0f,
-                    -Mathf.Abs(collider.size.y) * 0.5f,
-                    -Mathf.Abs(collider.size.z) * 0.5f - 0.45f);
-                point.localPosition = geometry.localPosition + geometry.localRotation * localOffset;
-                point.localRotation = geometry.localRotation;
+                var observer = Camera.main != null ? Camera.main.transform.position : anchor.position - geometry.forward;
+                SeatGeometry.Calculate(collider, observer, label == PxrSemanticLabel.Sofa,
+                    out var approach, out _, out var facing);
+                point.SetPositionAndRotation(approach, facing);
             }
             return point;
         }
@@ -299,22 +297,14 @@ namespace Aigf.Companion.Pico
             if (!IsSeatLabel(label)) return null;
             if (geometry == null || !geometry.TryGetComponent<BoxCollider>(out var collider)) return null;
 
-            var objectHeight = Mathf.Abs(collider.size.y);
-            var objectDepth = Mathf.Abs(collider.size.z);
             var isSofa = string.Equals(label.ToString(), "Sofa", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(label.ToString(), "Couch", StringComparison.OrdinalIgnoreCase);
-            var seatHeightFromBottom = isSofa
-                ? Mathf.Clamp(objectHeight * 0.45f, 0.38f, 0.52f)
-                : Mathf.Clamp(objectHeight * 0.48f, 0.4f, 0.58f);
-            var seatOffset = collider.center + new Vector3(
-                0f,
-                -objectHeight * 0.5f + seatHeightFromBottom,
-                -Mathf.Min(0.18f, objectDepth * 0.15f));
+            SeatGeometry.Calculate(collider, approach.position, isSofa,
+                out _, out var seatPosition, out var seatRotation);
 
             var sit = new GameObject("SitPoint").transform;
             sit.SetParent(anchor, false);
-            sit.localPosition = geometry.localPosition + geometry.localRotation * seatOffset;
-            sit.localRotation = geometry.localRotation * Quaternion.Euler(0f, 180f, 0f);
+            sit.SetPositionAndRotation(seatPosition, seatRotation);
             var interaction = anchor.gameObject.AddComponent<InteractionAnchor>();
             interaction.Configure(approach, sit, sit);
             return interaction;

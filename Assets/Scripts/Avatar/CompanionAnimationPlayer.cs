@@ -154,6 +154,9 @@ namespace Aigf.Companion.Avatar
             }
 
             animator.applyRootMotion = false;
+            // Seat alignment reads hips even when the HMD is facing elsewhere.
+            // CullUpdateTransforms freezes those bones in the previous pose.
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             graph = PlayableGraph.Create("Mint authored humanoid motion");
             graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
             mixer = AnimationMixerPlayable.Create(graph, clips.Length);

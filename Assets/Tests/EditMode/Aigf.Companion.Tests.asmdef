@@ -2,7 +2,8 @@
   "name": "Aigf.Companion.Tests",
   "rootNamespace": "Aigf.Companion.Tests",
   "references": [
-    "Aigf.Companion.Runtime"
+    "Aigf.Companion.Runtime",
+    "PonyuDev.SherpaOnnx"
   ],
   "includePlatforms": [
     "Editor"

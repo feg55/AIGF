@@ -12,6 +12,7 @@ See:
 - `Documentation/ARCHITECTURE.md`
 - `Documentation/PICO_BUILD.md`
 - `Documentation/STATUS.md`
+- `Documentation/FIXES_2026-09-05.md` (seating, X mute, microphone and neural conversation fixes)
 - `Documentation/PICO_DEVICE_TEST.md`
 - `Native/LlamaBridge/README.md`
 - `THIRD_PARTY_NOTICES.md`

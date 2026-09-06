@@ -115,6 +115,10 @@ namespace Aigf.Companion.Editor
             ValidateMintAnimations();
             if (!File.Exists(NativePluginPath))
                 throw new BuildFailedException($"Native llama.cpp plugin is missing: {NativePluginPath}");
+            RequireProjectFile("Assets/Plugins/Android/arm64-v8a/libc++_shared.so");
+            var runtimeImporter = AssetImporter.GetAtPath("Assets/Plugins/Android/arm64-v8a/libc++_shared.so") as PluginImporter;
+            if (runtimeImporter == null || !runtimeImporter.GetCompatibleWithPlatform(BuildTarget.Android))
+                throw new BuildFailedException("The llama.cpp C++ runtime must be enabled for Android.");
             RequireText(
                 "Assets/Plugins/Android/AndroidManifest.xml",
                 "android.permission.RECORD_AUDIO");

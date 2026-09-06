@@ -9,8 +9,8 @@ namespace Aigf.Companion.Core
         [SerializeField] private bool useMockLLM;
         [SerializeField] private bool fallBackToMockWhenModelUnavailable = true;
         [SerializeField] private string modelFilename = "qwen3-0.6b-q8_0.gguf";
-        [SerializeField, Min(512)] private int contextSize = 2048;
-        [SerializeField, Range(16, 512)] private int maxTokens = 128;
+        [SerializeField, Min(512)] private int contextSize = 4096;
+        [SerializeField, Range(16, 512)] private int maxTokens = 384;
         [SerializeField, Range(1, 12)] private int threads = 4;
         [SerializeField, Range(0f, 2f)] private float temperature = 0.35f;
         [SerializeField, Range(0.1f, 1f)] private float topP = 0.9f;

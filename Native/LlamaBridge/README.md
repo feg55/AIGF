@@ -39,15 +39,26 @@ Use shell-appropriate path syntax on macOS/Linux. Copy the resulting `libgirlfri
 
 `Assets/Plugins/Android/arm64-v8a/libgirlfriend_ai.so`
 
-The bridge links Android's shared C++ runtime. Copy the resulting library to the existing plugin location and keep its importer Android/ARM64-only.
+The bridge links Android's shared C++ runtime. Unity IL2CPP does **not** automatically
+include this library. Copy the matching NDK file
+`toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so`
+to `Assets/Plugins/Android/arm64-v8a/libc++_shared.so` and keep both importers
+Android/ARM64-only. Strip the bridge with the same NDK's `llvm-strip --strip-unneeded`.
+The release validator rejects a missing C++ runtime.
 
 ## Runtime flow
 
 1. Unity reads `Assets/StreamingAssets/Models/model-manifest.json`.
 2. On Android, `BundledModelInstaller` verifies or installs the bundled GGUF once in permanent private app files.
 3. `gf_init` receives that normal UTF-8 filesystem path and loads the model.
-4. `gf_generate` creates a request context and performs bounded sampling on a worker task.
+4. `gf_generate` creates a request context and performs bounded sampling on a worker task. A GBNF grammar enforces the response shape, including freely generated speech and optional actions.
 5. `gf_cancel` cooperatively aborts CPU decode when a newer command replaces the request.
 6. `gf_shutdown` releases model and backend state.
 
 CPU inference is the supported baseline. GPU offload is opt-in and must be profiled on the target PICO runtime. Generated build directories and upstream llama.cpp sources should not be committed here.
+
+`smoke_test.cpp` is an optional Android executable that loads the real GGUF and
+asks an ordinary Russian conversation question. Compile using the same NDK,
+link with `-Lbuild-android -lgirlfriend_ai`, and run from a temporary device
+directory containing the bridge and C++ runtime with `LD_LIBRARY_PATH` pointing
+at that directory. Pass the installed GGUF path as its only argument.
